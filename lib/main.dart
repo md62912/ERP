@@ -19,7 +19,7 @@ class HrmErpApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'HRM ERP',
+      title: 'Xebec Trading Services · HRM ERP',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
