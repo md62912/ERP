@@ -5,6 +5,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../domain/entities/project.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/kanban_board.dart';
 import '../../shared/widgets/status_pill.dart';
 
 Color _priorityColor(TaskPriority p) => switch (p) {
@@ -14,13 +15,13 @@ Color _priorityColor(TaskPriority p) => switch (p) {
       TaskPriority.urgent => Colors.red,
     };
 
-Color _taskStatusColor(TaskStatus s) => switch (s) {
-      TaskStatus.todo => Colors.blueGrey,
-      TaskStatus.inProgress => Colors.blue,
-      TaskStatus.inReview => Colors.purple,
-      TaskStatus.blocked => Colors.red,
-      TaskStatus.done => Colors.green,
-    };
+const _statusColumns = [
+  KanbanColumnDef(status: TaskStatus.todo, label: 'To Do', icon: Icons.radio_button_unchecked, color: Colors.blueGrey),
+  KanbanColumnDef(status: TaskStatus.inProgress, label: 'In Progress', icon: Icons.autorenew_rounded, color: Colors.blue),
+  KanbanColumnDef(status: TaskStatus.inReview, label: 'In Review', icon: Icons.rate_review_outlined, color: Colors.purple),
+  KanbanColumnDef(status: TaskStatus.blocked, label: 'Blocked', icon: Icons.block_rounded, color: Colors.red),
+  KanbanColumnDef(status: TaskStatus.done, label: 'Done', icon: Icons.check_circle_rounded, color: Colors.green),
+];
 
 class ProjectDetailScreen extends ConsumerWidget {
   final String projectId;
@@ -56,66 +57,53 @@ class _TasksTab extends ConsumerWidget {
   final String projectId;
   const _TasksTab({required this.projectId});
 
+  Widget _buildCard(BuildContext context, ProjectTask task) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(width: 4, height: 16, decoration: BoxDecoration(color: _priorityColor(task.priority), borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 6),
+                Expanded(child: Text(task.title, style: Theme.of(context).textTheme.titleSmall, maxLines: 2, overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+            if (task.dueDate != null) ...[
+              const SizedBox(height: 6),
+              Text('Due ${Formatters.date(task.dueDate)}', style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasks = ref.watch(projectTasksProvider(projectId));
 
-    return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(projectTasksProvider(projectId)),
-      child: tasks.when(
-        loading: () => const LoadingView(),
-        error: (e, _) => ErrorView(error: e),
-        data: (list) => list.isEmpty
-            ? const EmptyState(icon: Icons.checklist_rounded, title: 'No tasks yet')
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: list.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, i) {
-                  final t = list[i];
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(width: 4, height: 40, decoration: BoxDecoration(color: _priorityColor(t.priority), borderRadius: BorderRadius.circular(2))),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(t.title, style: Theme.of(context).textTheme.titleSmall),
-                                if (t.dueDate != null)
-                                  Text('Due ${Formatters.date(t.dueDate)}', style: Theme.of(context).textTheme.bodySmall),
-                              ],
-                            ),
-                          ),
-                          DropdownButton<TaskStatus>(
-                            value: t.status,
-                            underline: const SizedBox.shrink(),
-                            icon: const Icon(Icons.expand_more, size: 18),
-                            items: [
-                              for (final s in TaskStatus.values)
-                                DropdownMenuItem(
-                                  value: s,
-                                  child: StatusPill(label: s.name, color: _taskStatusColor(s)),
-                                ),
-                            ],
-                            onChanged: (newStatus) async {
-                              if (newStatus == null) return;
-                              await ref.read(taskRepositoryProvider).updateStatus(t.id, newStatus);
-                              ref.invalidate(projectTasksProvider(projectId));
-                              ref.invalidate(myTasksProvider);
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-      ),
+    return tasks.when(
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(error: e),
+      data: (list) => list.isEmpty
+          ? const EmptyState(icon: Icons.checklist_rounded, title: 'No tasks yet')
+          : KanbanBoard<ProjectTask, TaskStatus>(
+              columns: _statusColumns,
+              items: list,
+              statusOf: (t) => t.status,
+              cardBuilder: (context, task) => _buildCard(context, task),
+              onStatusChanged: (task, newStatus) async {
+                if (task.status == newStatus) return;
+                await ref.read(taskRepositoryProvider).updateStatus(task.id, newStatus);
+                ref.invalidate(projectTasksProvider(projectId));
+                ref.invalidate(myTasksProvider);
+              },
+            ),
     );
   }
 }
