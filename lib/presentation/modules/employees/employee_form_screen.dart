@@ -28,11 +28,11 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   late final _salaryCtrl =
       TextEditingController(text: widget.existing?.salary?.toStringAsFixed(2));
 
-  String? _departmentId = widget.existing?.departmentId;
-  UserRole _role = widget.existing?.role ?? UserRole.employee;
-  EmploymentType _employmentType = widget.existing?.employmentType ?? EmploymentType.fullTime;
-  EmployeeStatus _status = widget.existing?.status ?? EmployeeStatus.active;
-  DateTime _joinDate = widget.existing?.joinDate ?? DateTime.now();
+  late String? _departmentId = widget.existing?.departmentId;
+  late UserRole _role = widget.existing?.role ?? UserRole.employee;
+  late EmploymentType _employmentType = widget.existing?.employmentType ?? EmploymentType.fullTime;
+  late EmployeeStatus _status = widget.existing?.status ?? EmployeeStatus.active;
+  late DateTime _joinDate = widget.existing?.joinDate ?? DateTime.now();
   bool _saving = false;
 
   Future<void> _submit() async {
