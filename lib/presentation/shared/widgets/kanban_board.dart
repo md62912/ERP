@@ -15,7 +15,7 @@ class KanbanColumnDef<S> {
 /// Uses Flutter's built-in LongPressDraggable/DragTarget rather than a
 /// third-party package -- long-press (not plain drag) is used so a normal
 /// vertical scroll gesture inside a column isn't mistaken for a drag.
-class KanbanBoard<T, S> extends StatelessWidget {
+class KanbanBoard<T extends Object, S> extends StatelessWidget {
   final List<KanbanColumnDef<S>> columns;
   final List<T> items;
   final S Function(T item) statusOf;
@@ -55,7 +55,7 @@ class KanbanBoard<T, S> extends StatelessWidget {
   }
 }
 
-class _KanbanColumn<T, S> extends StatelessWidget {
+class _KanbanColumn<T extends Object, S> extends StatelessWidget {
   final KanbanColumnDef<S> column;
   final List<T> items;
   final Widget Function(BuildContext context, T item) cardBuilder;
