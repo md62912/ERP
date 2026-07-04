@@ -8,6 +8,7 @@ import '../../../core/utils/formatters.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/status_pill.dart';
+import '../../../core/utils/error_helper.dart';
 
 Color _projectStatusColor(ProjectStatus s) => switch (s) {
       ProjectStatus.planning => Colors.blueGrey,
@@ -134,7 +135,7 @@ class ProjectListScreen extends ConsumerWidget {
                         ref.invalidate(projectListProvider);
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create project: $e')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create project: ${friendlyError(e)}')));
                         }
                       }
                     },

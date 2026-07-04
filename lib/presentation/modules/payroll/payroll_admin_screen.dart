@@ -4,6 +4,7 @@ import '../../providers/payroll_admin_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../../core/utils/error_helper.dart';
 
 const _monthNames = [
   '', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -64,7 +65,7 @@ class PayrollAdminScreen extends ConsumerWidget {
       ref.invalidate(payrollRunsProvider);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create run: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create run: ${friendlyError(e)}')));
       }
     }
   }
@@ -142,7 +143,7 @@ class _RunCardState extends ConsumerState<_RunCard> {
         children: [
           payslips.when(
             loading: () => const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
-            error: (e, _) => Padding(padding: const EdgeInsets.all(12), child: Text('Error: $e')),
+            error: (e, _) => Padding(padding: const EdgeInsets.all(12), child: Text('Error: ${friendlyError(e)}')),
             data: (rows) => rows.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(12),
@@ -183,7 +184,7 @@ class _RunCardState extends ConsumerState<_RunCard> {
                               } catch (e) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context)
-                                      .showSnackBar(SnackBar(content: Text('Failed: $e')));
+                                      .showSnackBar(SnackBar(content: Text('Failed: ${friendlyError(e)}')));
                                 }
                               } finally {
                                 if (mounted) setState(() => _processing = false);

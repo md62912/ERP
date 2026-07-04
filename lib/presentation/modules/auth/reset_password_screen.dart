@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../../core/utils/error_helper.dart';
 
 /// Shown when the app detects a `passwordRecovery` auth event (i.e. the
 /// person followed a reset-password email link). Unlike other auth
@@ -40,7 +41,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         );
       }
     } catch (e) {
-      setState(() => _error = 'Could not update password: $e');
+      setState(() => _error = 'Could not update password: ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -10,6 +10,7 @@ import '../../../domain/entities/employee.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/status_pill.dart';
 import 'employee_form_screen.dart';
+import '../../../core/utils/error_helper.dart';
 
 Color _employeeStatusColor(EmployeeStatus status) => switch (status) {
       EmployeeStatus.active => Colors.green,
@@ -41,7 +42,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: ${friendlyError(e)}')));
       }
     }
   }
@@ -53,7 +54,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
       await launchUrl(Uri.parse(signedUrl), mode: LaunchMode.externalApplication);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open document: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open document: ${friendlyError(e)}')));
       }
     }
   }

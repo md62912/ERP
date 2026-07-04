@@ -56,15 +56,12 @@ values ('<auth-user-uuid>', 'EMP-0001', 'Jane', 'Doe', 'jane@example.com', curre
 
 ## What's stubbed / not yet built
 
-- Password reset flow
-- Sign-up doesn't (and shouldn't) create an employee row itself — HR links the new auth account to an `employees` record manually (RLS restricts that insert to hr/admin by design; see "Creating your first user" above, same flow applies to self-signed-up accounts)
-- Project/task/schedule-event creation forms beyond the basic dialogs already in place
-- Schedule event attendee invite picker (currently creates events without attendees — add via `ScheduleActions.createEvent(attendeeIds: [...])`)
-- Kanban drag-and-drop for tasks (status changes are tap-to-cycle or a dropdown for now)
-- Payroll's payslip calculation is a simple gross/net formula with no proration for absences or partial-month joiners — a real system would pull attendance data into the calculation
-- Push notifications, offline (Hive) support, PDF payslip export
+- Push notifications (Firebase Cloud Messaging is in pubspec.yaml but not wired up)
+- Offline support (Hive is in pubspec.yaml but not wired up)
+- PDF payslip export
+- Custom app icon (currently the default Flutter launcher icon)
 
-The plumbing (models, repositories, RLS-aware queries) is in place throughout, so each remaining item is mostly a new screen + a couple of Supabase calls.
+Everything else originally listed here — password reset, project/task creation forms, schedule event attendee invites, Kanban drag-and-drop, payroll proration for absences, full org-hierarchy access control — has been built. See git log for details on each.
 
 ## Database modules (Supabase project `hbzzvttszanbecmdmuce`)
 

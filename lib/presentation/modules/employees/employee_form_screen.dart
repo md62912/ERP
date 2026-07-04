@@ -4,6 +4,7 @@ import '../../providers/department_provider.dart';
 import '../../providers/employee_provider.dart';
 import '../../../domain/entities/employee.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/error_helper.dart';
 
 /// Create or edit an employee. HR/Admin only — RLS will reject the
 /// write for anyone else regardless of what this form lets you type.
@@ -70,7 +71,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save employee: $e')),
+          SnackBar(content: Text('Could not save employee: ${friendlyError(e)}')),
         );
       }
     } finally {
@@ -131,7 +132,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             const SizedBox(height: 12),
             departments.when(
               loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('Could not load departments: $e'),
+              error: (e, _) => Text('Could not load departments: ${friendlyError(e)}'),
               data: (list) => DropdownButtonFormField<String>(
                 value: _departmentId,
                 decoration: const InputDecoration(labelText: 'Department'),
@@ -153,7 +154,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             const SizedBox(height: 12),
             employeeListForManager.when(
               loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('Could not load employees: $e'),
+              error: (e, _) => Text('Could not load employees: ${friendlyError(e)}'),
               data: (list) {
                 // Can't report to yourself, and (when editing) can't
                 // report to someone who already reports to you --

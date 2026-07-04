@@ -8,6 +8,7 @@ import '../../providers/dashboard_provider.dart';
 import '../../shared/widgets/kpi_card.dart';
 import '../employees/employee_form_screen.dart';
 import '../payroll/payroll_admin_screen.dart';
+import '../../../core/utils/error_helper.dart';
 
 final _orgStatsProvider = FutureProvider.autoDispose((ref) async {
   final client = SupabaseService.client;
@@ -106,7 +107,7 @@ class HrAdminDashboardScreen extends ConsumerWidget {
                   // Org KPI grid
                   orgStats.when(
                     loading: () => const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: CircularProgressIndicator())),
-                    error: (e, _) => Text('Could not load stats: $e', style: TextStyle(color: colorScheme.error)),
+                    error: (e, _) => Text('Could not load stats: ${friendlyError(e)}', style: TextStyle(color: colorScheme.error)),
                     data: (s) => GridView.count(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -170,7 +171,7 @@ class HrAdminDashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   departments.when(
                     loading: () => const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: LinearProgressIndicator()),
-                    error: (e, _) => Text('Could not load: $e'),
+                    error: (e, _) => Text('Could not load: ${friendlyError(e)}'),
                     data: (rows) => rows.isEmpty
                         ? Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('No department data yet', style: textTheme.bodySmall)))
                         : Card(
@@ -193,7 +194,7 @@ class HrAdminDashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   recentHires.when(
                     loading: () => const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: LinearProgressIndicator()),
-                    error: (e, _) => Text('Could not load: $e'),
+                    error: (e, _) => Text('Could not load: ${friendlyError(e)}'),
                     data: (rows) => rows.isEmpty
                         ? Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('No new hires in the last 30 days', style: textTheme.bodySmall)))
                         : Card(

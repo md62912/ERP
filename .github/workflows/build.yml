@@ -27,6 +27,12 @@ jobs:
       - name: Ensure web platform scaffold exists
         run: flutter create --platforms=web .
 
+      - name: Apply branding to web scaffold
+        run: |
+          sed -i 's/<title>.*<\/title>/<title>Xebec Trading Services - HRM ERP<\/title>/' web/index.html
+          sed -i 's/"name": ".*"/"name": "Xebec Trading Services HRM ERP"/' web/manifest.json
+          sed -i 's/"short_name": ".*"/"short_name": "Xebec ERP"/' web/manifest.json
+
       - name: Build web
         run: flutter build web --release --base-href /${{ github.event.repository.name }}/
 
@@ -77,6 +83,10 @@ jobs:
             echo "INTERNET permission already present"
           fi
           cat "$MANIFEST"
+
+      - name: Apply branding to Android scaffold
+        run: |
+          sed -i 's/android:label="[^"]*"/android:label="Xebec ERP"/' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
         run: flutter build apk --release

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../../core/utils/error_helper.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -40,7 +41,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           );
       setState(() => _sent = true);
     } catch (e) {
-      setState(() => _error = 'Could not send reset email: $e');
+      setState(() => _error = 'Could not send reset email: ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

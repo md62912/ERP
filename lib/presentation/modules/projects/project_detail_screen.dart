@@ -9,6 +9,7 @@ import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/kanban_board.dart';
 import '../../shared/widgets/status_pill.dart';
+import '../../../core/utils/error_helper.dart';
 
 Color _priorityColor(TaskPriority p) => switch (p) {
       TaskPriority.low => Colors.blueGrey,
@@ -111,7 +112,7 @@ class ProjectDetailScreen extends ConsumerWidget {
                         ref.invalidate(myTasksProvider);
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create task: $e')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create task: ${friendlyError(e)}')));
                         }
                       }
                     },
@@ -188,7 +189,7 @@ class ProjectDetailScreen extends ConsumerWidget {
                         ref.invalidate(projectMembersProvider(projectId));
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not add member: $e')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not add member: ${friendlyError(e)}')));
                         }
                       }
                     },
@@ -337,7 +338,7 @@ class _TeamTab extends ConsumerWidget {
                       ref.invalidate(projectMembersProvider(projectId));
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update role: $e')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update role: ${friendlyError(e)}')));
                       }
                     }
                   },
@@ -347,7 +348,7 @@ class _TeamTab extends ConsumerWidget {
                       ref.invalidate(projectMembersProvider(projectId));
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not remove member: $e')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not remove member: ${friendlyError(e)}')));
                       }
                     }
                   },

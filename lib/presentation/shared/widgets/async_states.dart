@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/error_helper.dart';
 
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key});
@@ -31,7 +32,7 @@ class ErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '$error',
+              friendlyError(error),
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
               maxLines: 3,

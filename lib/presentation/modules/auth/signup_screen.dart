@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
+import '../../../core/utils/error_helper.dart';
 
 /// Creates an auth account only. There's deliberately no employee-table
 /// insert here: RLS restricts that table's writes to hr/admin, so a
@@ -38,7 +39,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       );
       setState(() => _done = true);
     } catch (e) {
-      setState(() => _error = 'Could not create account: $e');
+      setState(() => _error = 'Could not create account: ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
