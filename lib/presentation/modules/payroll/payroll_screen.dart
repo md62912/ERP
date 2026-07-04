@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/services/payslip_pdf.dart';
+import '../../../core/utils/error_helper.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../../domain/entities/employee.dart';
@@ -33,6 +35,18 @@ Color _payslipStatusColor(String status) => switch (status) {
 
 class PayrollScreen extends ConsumerWidget {
   const PayrollScreen({super.key});
+
+  Future<void> _downloadPdf(BuildContext context, WidgetRef ref, Map<String, dynamic> payslip) async {
+    final me = await ref.read(currentEmployeeProvider.future);
+    if (me == null) return;
+    try {
+      await sharePayslipPdf(payslip: payslip, employeeName: me.fullName, empCode: me.empCode);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not generate PDF: ${friendlyError(e)}')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -103,6 +117,11 @@ class PayrollScreen extends ConsumerWidget {
                               ),
                             ),
                             StatusPill(label: status, color: _payslipStatusColor(status)),
+                            IconButton(
+                              icon: const Icon(Icons.picture_as_pdf_outlined),
+                              tooltip: 'Download PDF',
+                              onPressed: () => _downloadPdf(context, ref, r),
+                            ),
                           ],
                         ),
                       ),

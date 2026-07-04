@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/supabase/supabase_client.dart';
 import '../../domain/entities/project.dart';
 import 'auth_provider.dart';
+import 'notification_provider.dart';
 
 final projectListProvider = FutureProvider.autoDispose<List<Project>>((ref) async {
   final rows = await SupabaseService.client
@@ -131,6 +132,18 @@ class TaskActions {
       'due_date': dueDate?.toIso8601String().split('T').first,
       'created_by': createdBy,
     });
+
+    if (assigneeId != null && assigneeId != createdBy) {
+      try {
+        await NotificationActions().notify(
+          employeeId: assigneeId,
+          title: 'New task assigned',
+          body: title,
+        );
+      } catch (_) {
+        // Non-critical -- the task itself was already created successfully.
+      }
+    }
   }
 }
 

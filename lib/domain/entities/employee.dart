@@ -115,4 +115,15 @@ class Employee {
         'status': _dbName(status),
         'salary': salary,
       };
+
+  /// Full round-trippable JSON (unlike [toInsertJson], which omits
+  /// server-assigned fields since it's meant for writes) -- used for
+  /// local caching, where we need to reconstruct the exact same object
+  /// via [Employee.fromJson] later.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'user_id': userId,
+        ...toInsertJson(),
+        'avatar_url': avatarUrl,
+      };
 }

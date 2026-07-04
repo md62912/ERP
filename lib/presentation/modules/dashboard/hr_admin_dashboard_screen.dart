@@ -6,6 +6,7 @@ import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../shared/widgets/kpi_card.dart';
+import '../../shared/widgets/notification_bell_button.dart';
 import '../employees/employee_form_screen.dart';
 import '../payroll/payroll_admin_screen.dart';
 import '../../../core/utils/error_helper.dart';
@@ -79,6 +80,7 @@ class HrAdminDashboardScreen extends ConsumerWidget {
               titleSpacing: 20,
               title: Text(me == null ? _greeting() : '${_greeting()}, ${me.firstName}', style: textTheme.titleLarge),
               actions: [
+                const NotificationBellButton(),
                 IconButton(
                   icon: const Icon(Icons.logout_rounded),
                   tooltip: 'Sign out',
@@ -91,6 +93,29 @@ class HrAdminDashboardScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+                  if (ref.watch(isShowingCachedDataProvider)) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.cloud_off_outlined, size: 16, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "You're offline — showing your last saved profile",
+                              style: textTheme.bodySmall?.copyWith(color: Colors.orange[800]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Row(
                     children: [
                       Text(Formatters.date(DateTime.now()), style: textTheme.bodyMedium),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/datasources/local/local_cache.dart';
 import '../../data/datasources/supabase/supabase_client.dart';
 import '../../domain/entities/employee.dart';
 import '../../data/repositories/employee_repository_impl.dart';
@@ -15,15 +16,35 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
   return authState.valueOrNull?.session != null || SupabaseService.currentUser != null;
 });
 
+/// Set to true whenever a data provider falls back to a locally cached
+/// value because the live fetch failed (almost always: no network).
+/// Screens can watch this to show a small "offline" indicator instead of
+/// pretending the (possibly stale) data is current.
+final isShowingCachedDataProvider = StateProvider<bool>((ref) => false);
+
+const _cachedProfileKey = 'employee_profile';
+
 /// The signed-in user's employee row (role, department, etc.) — this is
 /// what drives role-based UI decisions client-side (RLS is the real
 /// enforcement; this is just for showing/hiding menu items).
+///
+/// Falls back to the last cached profile if the live fetch fails (no
+/// network), so the app remains at least partially usable offline
+/// instead of the whole UI going blank because this one query failed.
 final currentEmployeeProvider = FutureProvider<Employee?>((ref) async {
   ref.watch(authStateProvider); // re-fetch on auth changes
   if (SupabaseService.currentUser == null) return null;
   try {
-    return await EmployeeRepositoryImpl().getMyProfile();
+    final employee = await EmployeeRepositoryImpl().getMyProfile();
+    await LocalCache.setJsonWithTimestamp(_cachedProfileKey, employee.toJson());
+    ref.read(isShowingCachedDataProvider.notifier).state = false;
+    return employee;
   } catch (_) {
+    final cached = LocalCache.getMap(_cachedProfileKey);
+    if (cached != null) {
+      ref.read(isShowingCachedDataProvider.notifier).state = true;
+      return Employee.fromJson(cached);
+    }
     return null;
   }
 });

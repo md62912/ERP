@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/supabase/supabase_client.dart';
 import 'auth_provider.dart';
+import 'notification_provider.dart';
 
 /// Whether the signed-in employee has anyone reporting to them --
 /// independent of their system `role`. This is what actually determines
@@ -31,9 +32,25 @@ final leaveApprovalActionsProvider = Provider((ref) => LeaveApprovalActions());
 
 class LeaveApprovalActions {
   Future<void> decide(String requestId, {required bool approve, required String approverId}) async {
-    await SupabaseService.client.from(Tables.leaveRequests).update({
-      'status': approve ? 'approved' : 'rejected',
-      'approved_by': approverId,
-    }).eq('id', requestId);
+    final row = await SupabaseService.client
+        .from(Tables.leaveRequests)
+        .update({
+          'status': approve ? 'approved' : 'rejected',
+          'approved_by': approverId,
+        })
+        .eq('id', requestId)
+        .select('employee_id')
+        .single();
+
+    try {
+      await NotificationActions().notify(
+        employeeId: row['employee_id'] as String,
+        title: approve ? 'Leave request approved' : 'Leave request rejected',
+        body: approve ? 'Your leave request has been approved.' : 'Your leave request was not approved.',
+      );
+    } catch (_) {
+      // Notification is a nice-to-have -- don't fail the approval itself
+      // if, for whatever reason, the notification insert doesn't go through.
+    }
   }
 }

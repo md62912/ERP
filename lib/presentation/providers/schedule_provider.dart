@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/supabase/supabase_client.dart';
 import '../../domain/entities/project.dart';
 import 'auth_provider.dart';
+import 'notification_provider.dart';
 
 /// Events either created by me or where I'm an invited attendee, from
 /// today onward — a simple upcoming-agenda view.
@@ -53,6 +54,18 @@ class ScheduleActions {
       await SupabaseService.client.from(Tables.scheduleAttendees).insert([
         for (final id in attendeeIds) {'schedule_event_id': eventId, 'employee_id': id},
       ]);
+
+      try {
+        for (final id in attendeeIds) {
+          await NotificationActions().notify(
+            employeeId: id,
+            title: 'Event invite: ${event.title}',
+            body: 'You\'ve been invited to an event.',
+          );
+        }
+      } catch (_) {
+        // Non-critical -- the event and invites themselves were already created.
+      }
     }
   }
 

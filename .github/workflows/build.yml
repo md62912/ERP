@@ -24,8 +24,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Ensure web platform scaffold exists
-        run: flutter create --platforms=web .
+      - name: Ensure platform scaffolds exist
+        run: flutter create --platforms=web,android .
+
+      - name: Generate app icons
+        run: dart run flutter_launcher_icons
 
       - name: Apply branding to web scaffold
         run: |
@@ -70,8 +73,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Ensure Android platform scaffold exists
-        run: flutter create --platforms=android .
+      - name: Ensure platform scaffolds exist
+        run: flutter create --platforms=android,web .
+
+      - name: Generate app icons
+        run: dart run flutter_launcher_icons
 
       - name: Ensure INTERNET permission is declared
         run: |
