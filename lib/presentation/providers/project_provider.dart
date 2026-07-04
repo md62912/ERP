@@ -37,6 +37,43 @@ final projectMilestonesProvider =
   return (rows as List).cast<Map<String, dynamic>>();
 });
 
+/// Team members currently on a project, joined with employee details.
+final projectMembersProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, projectId) async {
+  final rows = await SupabaseService.client
+      .from(Tables.projectMembers)
+      .select('*, employees(id, first_name, last_name, designation)')
+      .eq('project_id', projectId)
+      .order('joined_at');
+  return (rows as List).cast<Map<String, dynamic>>();
+});
+
+final projectMemberActionsProvider = Provider((ref) => ProjectMemberActions());
+
+class ProjectMemberActions {
+  Future<void> addMember({
+    required String projectId,
+    required String employeeId,
+    String roleInProject = 'member',
+  }) async {
+    await SupabaseService.client.from(Tables.projectMembers).insert({
+      'project_id': projectId,
+      'employee_id': employeeId,
+      'role_in_project': roleInProject,
+    });
+  }
+
+  Future<void> updateMemberRole(String memberRowId, String roleInProject) async {
+    await SupabaseService.client
+        .from(Tables.projectMembers)
+        .update({'role_in_project': roleInProject}).eq('id', memberRowId);
+  }
+
+  Future<void> removeMember(String memberRowId) async {
+    await SupabaseService.client.from(Tables.projectMembers).delete().eq('id', memberRowId);
+  }
+}
+
 /// Tasks assigned to the signed-in employee, across all projects —
 /// this is the "My Tasks" tracking view.
 final myTasksProvider = FutureProvider.autoDispose<List<ProjectTask>>((ref) async {

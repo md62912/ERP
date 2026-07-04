@@ -123,12 +123,89 @@ class ProjectDetailScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _showAddMemberDialog(BuildContext context, WidgetRef ref) async {
+    String? selectedEmployeeId;
+    String roleInProject = 'member';
+
+    final employees = await ref.read(employeeListProvider.future);
+    final existingMembers = await ref.read(projectMembersProvider(projectId).future);
+    final existingIds = existingMembers.map((m) => m['employee_id'] as String).toSet();
+    final candidates = employees.where((e) => !existingIds.contains(e.id)).toList();
+
+    if (!context.mounted) return;
+
+    if (candidates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Everyone is already on this project')),
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Add Team Member'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedEmployeeId,
+                decoration: const InputDecoration(labelText: 'Employee'),
+                items: [
+                  for (final e in candidates)
+                    DropdownMenuItem(value: e.id, child: Text('${e.fullName} (${e.designation ?? e.role.name})')),
+                ],
+                onChanged: (v) => setState(() => selectedEmployeeId = v),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: roleInProject,
+                decoration: const InputDecoration(labelText: 'Role on this project'),
+                items: const [
+                  DropdownMenuItem(value: 'lead', child: Text('Lead')),
+                  DropdownMenuItem(value: 'member', child: Text('Member')),
+                  DropdownMenuItem(value: 'viewer', child: Text('Viewer')),
+                ],
+                onChanged: (v) => setState(() => roleInProject = v!),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: selectedEmployeeId == null
+                  ? null
+                  : () async {
+                      try {
+                        await ref.read(projectMemberActionsProvider).addMember(
+                              projectId: projectId,
+                              employeeId: selectedEmployeeId!,
+                              roleInProject: roleInProject,
+                            );
+                        if (context.mounted) Navigator.pop(context);
+                        ref.invalidate(projectMembersProvider(projectId));
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not add member: $e')));
+                        }
+                      }
+                    },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final project = ref.watch(projectByIdProvider(projectId));
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: project.when(
@@ -136,12 +213,13 @@ class ProjectDetailScreen extends ConsumerWidget {
             loading: () => const Text('Project'),
             error: (_, __) => const Text('Project'),
           ),
-          bottom: const TabBar(tabs: [Tab(text: 'Tasks'), Tab(text: 'Milestones')]),
+          bottom: const TabBar(tabs: [Tab(text: 'Tasks'), Tab(text: 'Milestones'), Tab(text: 'Team')]),
         ),
         body: TabBarView(
           children: [
             _TasksTab(projectId: projectId),
             _MilestonesTab(projectId: projectId),
+            _TeamTab(projectId: projectId, onAddMember: () => _showAddMemberDialog(context, ref)),
           ],
         ),
         floatingActionButton: FloatingActionButton(
@@ -210,6 +288,140 @@ class _TasksTab extends ConsumerWidget {
                 }
               },
             ),
+    );
+  }
+}
+
+class _TeamTab extends ConsumerWidget {
+  final String projectId;
+  final VoidCallback onAddMember;
+  const _TeamTab({required this.projectId, required this.onAddMember});
+
+  Color _roleColor(String role) => switch (role) {
+        'lead' => Colors.indigo,
+        'viewer' => Colors.blueGrey,
+        _ => Colors.teal,
+      };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = ref.watch(projectMembersProvider(projectId));
+
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(projectMembersProvider(projectId)),
+      child: members.when(
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e),
+        data: (list) => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            OutlinedButton.icon(
+              onPressed: onAddMember,
+              icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+              label: const Text('Add team member'),
+            ),
+            const SizedBox(height: 16),
+            if (list.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: EmptyState(icon: Icons.groups_outlined, title: 'No team members yet'),
+              )
+            else
+              for (final m in list) ...[
+                _MemberCard(
+                  member: m,
+                  roleColor: _roleColor(m['role_in_project'] as String),
+                  onRoleChanged: (newRole) async {
+                    try {
+                      await ref.read(projectMemberActionsProvider).updateMemberRole(m['id'] as String, newRole);
+                      ref.invalidate(projectMembersProvider(projectId));
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update role: $e')));
+                      }
+                    }
+                  },
+                  onRemove: () async {
+                    try {
+                      await ref.read(projectMemberActionsProvider).removeMember(m['id'] as String);
+                      ref.invalidate(projectMembersProvider(projectId));
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not remove member: $e')));
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberCard extends StatelessWidget {
+  final Map<String, dynamic> member;
+  final Color roleColor;
+  final ValueChanged<String> onRoleChanged;
+  final VoidCallback onRemove;
+
+  const _MemberCard({
+    required this.member,
+    required this.roleColor,
+    required this.onRoleChanged,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final employee = member['employees'] as Map?;
+    final name = employee == null ? 'Unknown' : '${employee['first_name']} ${employee['last_name']}';
+    final designation = employee?['designation'] as String?;
+    final roleInProject = member['role_in_project'] as String;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: roleColor.withOpacity(0.14),
+              child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: roleColor)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(name, style: Theme.of(context).textTheme.titleSmall),
+                  if (designation != null) Text(designation, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+            DropdownButton<String>(
+              value: roleInProject,
+              underline: const SizedBox.shrink(),
+              icon: const Icon(Icons.expand_more, size: 18),
+              items: const [
+                DropdownMenuItem(value: 'lead', child: Text('Lead')),
+                DropdownMenuItem(value: 'member', child: Text('Member')),
+                DropdownMenuItem(value: 'viewer', child: Text('Viewer')),
+              ],
+              onChanged: (v) {
+                if (v != null) onRoleChanged(v);
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: 'Remove from project',
+              onPressed: onRemove,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
