@@ -104,7 +104,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
               Center(
                 child: Text(
                   employee.designation ?? employee.role.name,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
                 ),
               ),
               const SizedBox(height: 24),
@@ -173,7 +173,7 @@ class _InfoTile extends StatelessWidget {
         children: [
           Expanded(
             flex: 2,
-            child: Text(label, style: TextStyle(color: Colors.grey[600])),
+            child: Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
           ),
           Expanded(flex: 3, child: Text(value)),
         ],

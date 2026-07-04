@@ -65,7 +65,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         children: [
           Text(
             'Sign up with your work email. HR will finish setting up your\nemployee profile before you can access company data.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
           ),
           const SizedBox(height: 24),
           TextFormField(
@@ -122,7 +122,7 @@ class _SuccessMessage extends StatelessWidget {
           'Confirm your address, then ask HR to link your account to an '
           'employee profile — you\'ll be able to sign in fully once that\'s done.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
         ),
         const SizedBox(height: 24),
         OutlinedButton(

@@ -106,7 +106,7 @@ class MyTasksScreen extends ConsumerWidget {
                         style: Theme.of(context)
                             .textTheme
                             .titleSmall
-                            ?.copyWith(color: Colors.grey[600], fontWeight: FontWeight.bold),
+                            ?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color, fontWeight: FontWeight.bold),
                       ),
                     ),
                     for (final task in grouped[status]!)
