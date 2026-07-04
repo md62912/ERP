@@ -67,6 +67,17 @@ jobs:
       - name: Ensure Android platform scaffold exists
         run: flutter create --platforms=android .
 
+      - name: Ensure INTERNET permission is declared
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.INTERNET" />' "$MANIFEST"
+            echo "Added missing INTERNET permission"
+          else
+            echo "INTERNET permission already present"
+          fi
+          cat "$MANIFEST"
+
       - name: Build APK
         run: flutter build apk --release
 
