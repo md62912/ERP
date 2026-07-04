@@ -20,7 +20,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
   }
 
   Future<void> _uploadDocument(BuildContext context, WidgetRef ref, String employeeId) async {
-    final result = await FilePicker.pickFiles(withData: true);
+    final result = await FilePicker.platform.pickFiles(withData: true);
     final file = result?.files.single;
     if (file == null || file.bytes == null) return;
 
