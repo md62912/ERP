@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/project_provider.dart';
+import '../../providers/employee_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/entities/project.dart';
 import '../../shared/widgets/async_states.dart';
@@ -27,6 +29,100 @@ class ProjectDetailScreen extends ConsumerWidget {
   final String projectId;
   const ProjectDetailScreen({super.key, required this.projectId});
 
+  Future<void> _showCreateTaskDialog(BuildContext context, WidgetRef ref) async {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    String? assigneeId;
+    TaskPriority priority = TaskPriority.medium;
+    DateTime? dueDate;
+
+    final employees = await ref.read(employeeListProvider.future);
+    if (!context.mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('New Task'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)'), maxLines: 2),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(
+                  value: assigneeId,
+                  decoration: const InputDecoration(labelText: 'Assignee'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('— Unassigned —')),
+                    for (final e in employees) DropdownMenuItem(value: e.id, child: Text(e.fullName)),
+                  ],
+                  onChanged: (v) => setState(() => assigneeId = v),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<TaskPriority>(
+                  value: priority,
+                  decoration: const InputDecoration(labelText: 'Priority'),
+                  items: [for (final p in TaskPriority.values) DropdownMenuItem(value: p, child: Text(p.name))],
+                  onChanged: (v) => setState(() => priority = v!),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) setState(() => dueDate = picked);
+                  },
+                  child: Text(dueDate == null ? 'Pick due date (optional)' : 'Due: ${Formatters.date(dueDate)}'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: titleCtrl.text.trim().isEmpty
+                  ? null
+                  : () async {
+                      final me = await ref.read(currentEmployeeProvider.future);
+                      if (me == null) return;
+                      try {
+                        await ref.read(taskRepositoryProvider).createTask(
+                              projectId: projectId,
+                              title: titleCtrl.text.trim(),
+                              description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                              assigneeId: assigneeId,
+                              priority: priority,
+                              dueDate: dueDate,
+                              createdBy: me.id,
+                            );
+                        if (context.mounted) Navigator.pop(context);
+                        ref.invalidate(projectTasksProvider(projectId));
+                        ref.invalidate(myTasksProvider);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create task: $e')));
+                        }
+                      }
+                    },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final project = ref.watch(projectByIdProvider(projectId));
@@ -47,6 +143,10 @@ class ProjectDetailScreen extends ConsumerWidget {
             _TasksTab(projectId: projectId),
             _MilestonesTab(projectId: projectId),
           ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => _showCreateTaskDialog(context, ref),
+          child: const Icon(Icons.add_task_rounded),
         ),
       ),
     );

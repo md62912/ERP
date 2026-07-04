@@ -32,12 +32,57 @@ class PayrollActions {
     return row['id'] as String;
   }
 
-  /// Pulls every active employee's current salary structure, computes
-  /// gross/net, and writes one payslip per employee for this run.
-  /// Simple formula: gross = basic + allowances, net = gross - deductions.
-  /// A real system would prorate for absences/leave; this is a starting point.
+  int _daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
+
+  bool _isWeekend(DateTime d) => d.weekday == DateTime.saturday || d.weekday == DateTime.sunday;
+
+  String _iso(DateTime d) => d.toIso8601String().split('T').first;
+
+  /// Inclusive overlap, in days, between two date ranges. Used to figure
+  /// out how much of an approved leave request actually falls inside the
+  /// payroll month (a leave spanning month boundaries shouldn't count in
+  /// full against either month).
+  int _overlapDays(DateTime aStart, DateTime aEnd, DateTime bStart, DateTime bEnd) {
+    final start = aStart.isAfter(bStart) ? aStart : bStart;
+    final end = aEnd.isBefore(bEnd) ? aEnd : bEnd;
+    final diff = end.difference(start).inDays + 1;
+    return diff > 0 ? diff : 0;
+  }
+
+  /// Pulls every active employee's current salary structure, prorates it
+  /// against actual attendance for the run's month, and writes one
+  /// payslip per employee.
+  ///
+  /// Proration model: `paid_days = present_days + approved_paid_leave_days`
+  /// (capped at the month's total working days); everything else counts
+  /// as unpaid absence. Earnings (basic + allowances) scale with
+  /// `paid_days / total_working_days`; deductions are left un-prorated
+  /// since things like tax/insurance are typically flat statutory amounts
+  /// rather than pay-period-proportional. Working days exclude weekends
+  /// and any date in the `holidays` table for that month.
   Future<int> generatePayslips(String runId) async {
     final client = SupabaseService.client;
+
+    final run = await client.from(Tables.payrollRuns).select().eq('id', runId).single();
+    final month = run['month'] as int;
+    final year = run['year'] as int;
+    final monthStart = DateTime(year, month, 1);
+    final monthEnd = DateTime(year, month, _daysInMonth(year, month));
+
+    final holidayRows = await client
+        .from(Tables.holidays)
+        .select('date')
+        .gte('date', _iso(monthStart))
+        .lte('date', _iso(monthEnd));
+    final holidayDates = {for (final h in holidayRows as List) h['date'] as String};
+
+    var totalWorkingDays = 0;
+    for (var d = monthStart; !d.isAfter(monthEnd); d = d.add(const Duration(days: 1))) {
+      if (!_isWeekend(d) && !holidayDates.contains(_iso(d))) totalWorkingDays++;
+    }
+    // Guard against a misconfigured month with zero working days (shouldn't
+    // normally happen, but would otherwise divide by zero below).
+    if (totalWorkingDays == 0) totalWorkingDays = _daysInMonth(year, month);
 
     final employees = await client.from(Tables.employees).select('id').eq('status', 'active');
 
@@ -63,17 +108,60 @@ class PayrollActions {
           (s['insurance_deduction'] as num? ?? 0) +
           (s['provident_fund'] as num? ?? 0);
 
-      final gross = basic + allowances;
+      // Attendance within the month: present/late count as a full day,
+      // half_day counts as half.
+      final attendanceRows = await client
+          .from(Tables.attendance)
+          .select('status')
+          .eq('employee_id', employeeId)
+          .gte('date', _iso(monthStart))
+          .lte('date', _iso(monthEnd));
+      double presentDays = 0;
+      for (final a in attendanceRows as List) {
+        final status = a['status'] as String;
+        if (status == 'present' || status == 'late') {
+          presentDays += 1;
+        } else if (status == 'half_day') {
+          presentDays += 0.5;
+        }
+      }
+
+      // Approved leave on a paid leave type, clipped to the days that
+      // actually fall within this month.
+      final leaveRows = await client
+          .from(Tables.leaveRequests)
+          .select('from_date, to_date, leave_types!inner(is_paid)')
+          .eq('employee_id', employeeId)
+          .eq('status', 'approved')
+          .eq('leave_types.is_paid', true)
+          .lte('from_date', _iso(monthEnd))
+          .gte('to_date', _iso(monthStart));
+      double paidLeaveDays = 0;
+      for (final l in leaveRows as List) {
+        final from = DateTime.parse(l['from_date'] as String);
+        final to = DateTime.parse(l['to_date'] as String);
+        paidLeaveDays += _overlapDays(from, to, monthStart, monthEnd);
+      }
+
+      final paidDays = (presentDays + paidLeaveDays).clamp(0, totalWorkingDays.toDouble());
+      final absentDays = totalWorkingDays - paidDays;
+      final prorationRatio = paidDays / totalWorkingDays;
+
+      final proratedBasic = basic * prorationRatio;
+      final proratedAllowances = allowances * prorationRatio;
+      final gross = proratedBasic + proratedAllowances;
       final net = gross - deductions;
 
       await client.from(Tables.payslips).upsert({
         'payroll_run_id': runId,
         'employee_id': employeeId,
-        'basic_salary': basic,
-        'total_allowances': allowances,
+        'basic_salary': proratedBasic,
+        'total_allowances': proratedAllowances,
         'total_deductions': deductions,
         'gross_salary': gross,
         'net_salary': net,
+        'paid_days': paidDays.round(),
+        'absent_days': absentDays.round(),
       }, onConflict: 'payroll_run_id,employee_id');
       generated++;
     }

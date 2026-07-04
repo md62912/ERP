@@ -32,6 +32,17 @@ final currentUserRoleProvider = Provider<UserRole?>((ref) {
   return ref.watch(currentEmployeeProvider).valueOrNull?.role;
 });
 
+/// Whether the current auth state came from clicking a password-reset
+/// email link. Supabase's client fires a dedicated `passwordRecovery`
+/// event for this (distinct from a normal sign-in), so this is purely
+/// derived from the stream -- no manual flag-setting needed. It clears
+/// itself once a different auth event fires (e.g. `userUpdated`, which
+/// Supabase emits right after a successful password change).
+final isPasswordRecoveryProvider = Provider<bool>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.valueOrNull?.event == AuthChangeEvent.passwordRecovery;
+});
+
 class AuthController {
   final SupabaseClient _client;
   AuthController(this._client);
@@ -41,6 +52,20 @@ class AuthController {
   }
 
   Future<void> signOut() => _client.auth.signOut();
+
+  /// Sends a password-reset email. [redirectTo] should point back at this
+  /// app (e.g. the GitHub Pages URL) -- Supabase's Auth settings must have
+  /// that URL allow-listed under Authentication > URL Configuration >
+  /// Redirect URLs, or the link in the email won't be able to return here.
+  Future<void> resetPasswordForEmail(String email, {required String redirectTo}) {
+    return _client.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
+  }
+
+  /// Sets a new password for the currently-recovering session (only valid
+  /// right after following a password-reset email link).
+  Future<void> updatePassword(String newPassword) {
+    return _client.auth.updateUser(UserAttributes(password: newPassword));
+  }
 }
 
 final authControllerProvider = Provider<AuthController>((ref) {

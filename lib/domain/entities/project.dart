@@ -129,6 +129,7 @@ class ScheduleEvent {
   final DateTime startTime;
   final DateTime endTime;
   final bool isAllDay;
+  final String? createdBy;
 
   const ScheduleEvent({
     required this.id,
@@ -140,6 +141,7 @@ class ScheduleEvent {
     required this.startTime,
     required this.endTime,
     this.isAllDay = false,
+    this.createdBy,
   });
 
   factory ScheduleEvent.fromJson(Map<String, dynamic> json) => ScheduleEvent(
@@ -152,6 +154,7 @@ class ScheduleEvent {
         startTime: DateTime.parse(json['start_time'] as String),
         endTime: DateTime.parse(json['end_time'] as String),
         isAllDay: json['is_all_day'] as bool? ?? false,
+        createdBy: json['created_by'] as String?,
       );
 
   Map<String, dynamic> toInsertJson() => {

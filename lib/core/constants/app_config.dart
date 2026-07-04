@@ -18,4 +18,13 @@ class AppConfig {
     defaultValue:
         'sb_publishable_6-IOiefMcUngPT7fNmRK9w_oH1Gn0-T',
   );
+
+  /// Used as the password-reset redirect target on native platforms
+  /// (Android/iOS), where there's no browser `Uri.base` to read from.
+  /// On web, the actual current origin is used instead (see
+  /// ForgotPasswordScreen) so this only matters for mobile builds.
+  static const String webAppUrl = String.fromEnvironment(
+    'WEB_APP_URL',
+    defaultValue: 'https://md62912.github.io/ERP/',
+  );
 }

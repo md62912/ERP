@@ -72,4 +72,54 @@ class TaskActions {
       'note': note,
     });
   }
+
+  /// Creates a task under a project. RLS restricts this to the project's
+  /// owner or hr/admin/manager -- if the signed-in user isn't one of
+  /// those, Supabase rejects the insert and this throws.
+  Future<void> createTask({
+    required String projectId,
+    required String title,
+    String? description,
+    String? assigneeId,
+    TaskPriority priority = TaskPriority.medium,
+    DateTime? dueDate,
+    required String createdBy,
+  }) async {
+    await SupabaseService.client.from(Tables.tasks).insert({
+      'project_id': projectId,
+      'title': title,
+      'description': description,
+      'assignee_id': assigneeId,
+      'priority': enumToDb(priority),
+      'due_date': dueDate?.toIso8601String().split('T').first,
+      'created_by': createdBy,
+    });
+  }
+}
+
+final projectActionsProvider = Provider((ref) => ProjectActions());
+
+class ProjectActions {
+  /// Creates a project owned by [ownerId]. RLS allows anyone to create a
+  /// project they own (owner_id = auth_employee_id() always satisfies the
+  /// policy), or hr/admin/manager to create on behalf of anyone.
+  Future<void> createProject({
+    required String name,
+    String? description,
+    required String ownerId,
+    ProjectStatus status = ProjectStatus.planning,
+    DateTime? startDate,
+    DateTime? endDate,
+    double? budget,
+  }) async {
+    await SupabaseService.client.from(Tables.projects).insert({
+      'name': name,
+      'description': description,
+      'owner_id': ownerId,
+      'status': enumToDb(status),
+      'start_date': startDate?.toIso8601String().split('T').first,
+      'end_date': endDate?.toIso8601String().split('T').first,
+      'budget': budget,
+    });
+  }
 }

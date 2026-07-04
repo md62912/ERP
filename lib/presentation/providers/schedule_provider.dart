@@ -28,6 +28,17 @@ final myUpcomingEventsProvider = FutureProvider.autoDispose<List<ScheduleEvent>>
   return events;
 });
 
+/// Attendee list for one event, joined with employee names, for display
+/// on the event card and the create/invite dialog.
+final eventAttendeesProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, eventId) async {
+  final rows = await SupabaseService.client
+      .from(Tables.scheduleAttendees)
+      .select('*, employees(first_name, last_name)')
+      .eq('schedule_event_id', eventId);
+  return (rows as List).cast<Map<String, dynamic>>();
+});
+
 final scheduleActionsProvider = Provider((ref) => ScheduleActions());
 
 class ScheduleActions {
