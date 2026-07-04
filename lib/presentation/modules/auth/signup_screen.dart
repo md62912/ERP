@@ -55,7 +55,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               child: Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
-                  child: _done ? _SuccessMessage() : _buildForm(),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: _done ? _SuccessMessage() : _buildForm(),
+                  ),
                 ),
               ),
             ),

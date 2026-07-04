@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'responsive_body.dart';
 
 /// Shared bottom-nav shell. Wraps every authenticated screen so the tab
 /// bar persists across navigation (state is preserved per GoRouter's
@@ -34,7 +35,7 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentIndex = _currentIndex(context);
     return Scaffold(
-      body: child,
+      body: ResponsiveBody(child: child),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (index) => context.go(_tabs[index].path),
