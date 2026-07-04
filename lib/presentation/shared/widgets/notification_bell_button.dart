@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/notification_provider.dart';
-import '../modules/notifications/notifications_screen.dart';
+import '../../modules/notifications/notifications_screen.dart';
 
 class NotificationBellButton extends ConsumerWidget {
   const NotificationBellButton({super.key});
