@@ -3,6 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/project_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/entities/project.dart';
+import '../../shared/widgets/async_states.dart';
+import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/status_pill.dart';
+
+Color _priorityColor(TaskPriority p) => switch (p) {
+      TaskPriority.low => Colors.blueGrey,
+      TaskPriority.medium => Colors.blue,
+      TaskPriority.high => Colors.orange,
+      TaskPriority.urgent => Colors.red,
+    };
+
+Color _taskStatusColor(TaskStatus s) => switch (s) {
+      TaskStatus.todo => Colors.blueGrey,
+      TaskStatus.inProgress => Colors.blue,
+      TaskStatus.inReview => Colors.purple,
+      TaskStatus.blocked => Colors.red,
+      TaskStatus.done => Colors.green,
+    };
 
 class ProjectDetailScreen extends ConsumerWidget {
   final String projectId;
@@ -38,50 +56,66 @@ class _TasksTab extends ConsumerWidget {
   final String projectId;
   const _TasksTab({required this.projectId});
 
-  Color _priorityColor(TaskPriority p) => switch (p) {
-        TaskPriority.low => Colors.grey,
-        TaskPriority.medium => Colors.blue,
-        TaskPriority.high => Colors.orange,
-        TaskPriority.urgent => Colors.red,
-      };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasks = ref.watch(projectTasksProvider(projectId));
 
-    return tasks.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Failed to load tasks: $e')),
-      data: (list) => list.isEmpty
-          ? const Center(child: Text('No tasks yet'))
-          : ListView.builder(
-              itemCount: list.length,
-              itemBuilder: (context, i) {
-                final t = list[i];
-                return ListTile(
-                  leading: CircleAvatar(
-                    radius: 6,
-                    backgroundColor: _priorityColor(t.priority),
-                  ),
-                  title: Text(t.title),
-                  subtitle: Text(t.dueDate != null ? 'Due ${Formatters.date(t.dueDate)}' : t.status.name),
-                  trailing: DropdownButton<TaskStatus>(
-                    value: t.status,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      for (final s in TaskStatus.values)
-                        DropdownMenuItem(value: s, child: Text(s.name)),
-                    ],
-                    onChanged: (newStatus) async {
-                      if (newStatus == null) return;
-                      await ref.read(taskRepositoryProvider).updateStatus(t.id, newStatus);
-                      ref.invalidate(projectTasksProvider(projectId));
-                      ref.invalidate(myTasksProvider);
-                    },
-                  ),
-                );
-              },
-            ),
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(projectTasksProvider(projectId)),
+      child: tasks.when(
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e),
+        data: (list) => list.isEmpty
+            ? const EmptyState(icon: Icons.checklist_rounded, title: 'No tasks yet')
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: list.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, i) {
+                  final t = list[i];
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(width: 4, height: 40, decoration: BoxDecoration(color: _priorityColor(t.priority), borderRadius: BorderRadius.circular(2))),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(t.title, style: Theme.of(context).textTheme.titleSmall),
+                                if (t.dueDate != null)
+                                  Text('Due ${Formatters.date(t.dueDate)}', style: Theme.of(context).textTheme.bodySmall),
+                              ],
+                            ),
+                          ),
+                          DropdownButton<TaskStatus>(
+                            value: t.status,
+                            underline: const SizedBox.shrink(),
+                            icon: const Icon(Icons.expand_more, size: 18),
+                            items: [
+                              for (final s in TaskStatus.values)
+                                DropdownMenuItem(
+                                  value: s,
+                                  child: StatusPill(label: s.name, color: _taskStatusColor(s)),
+                                ),
+                            ],
+                            onChanged: (newStatus) async {
+                              if (newStatus == null) return;
+                              await ref.read(taskRepositoryProvider).updateStatus(t.id, newStatus);
+                              ref.invalidate(projectTasksProvider(projectId));
+                              ref.invalidate(myTasksProvider);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }
@@ -94,26 +128,34 @@ class _MilestonesTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final milestones = ref.watch(projectMilestonesProvider(projectId));
 
-    return milestones.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Failed to load milestones: $e')),
-      data: (list) => list.isEmpty
-          ? const Center(child: Text('No milestones yet'))
-          : ListView.builder(
-              itemCount: list.length,
-              itemBuilder: (context, i) {
-                final m = list[i];
-                final done = m['status'] == 'completed';
-                return ListTile(
-                  leading: Icon(
-                    done ? Icons.check_circle : Icons.radio_button_unchecked,
-                    color: done ? Colors.green : Colors.grey,
-                  ),
-                  title: Text(m['name'] as String),
-                  subtitle: m['due_date'] != null ? Text('Due ${m['due_date']}') : null,
-                );
-              },
-            ),
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(projectMilestonesProvider(projectId)),
+      child: milestones.when(
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e),
+        data: (list) => list.isEmpty
+            ? const EmptyState(icon: Icons.flag_outlined, title: 'No milestones yet')
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: list.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, i) {
+                  final m = list[i];
+                  final done = m['status'] == 'completed';
+                  return Card(
+                    child: ListTile(
+                      leading: Icon(
+                        done ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                        color: done ? Colors.green : Colors.grey,
+                      ),
+                      title: Text(m['name'] as String, style: Theme.of(context).textTheme.titleSmall),
+                      subtitle: m['due_date'] != null ? Text('Due ${m['due_date']}') : null,
+                      trailing: StatusPill(label: done ? 'completed' : 'pending', color: done ? Colors.green : Colors.orange),
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }

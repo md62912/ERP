@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/payroll_admin_provider.dart';
 import '../../../core/utils/formatters.dart';
+import '../../shared/widgets/async_states.dart';
+import '../../shared/widgets/empty_state.dart';
 
 const _monthNames = [
   '', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -76,10 +78,10 @@ class PayrollAdminScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(payrollRunsProvider),
         child: runs.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Failed to load payroll runs: $e')),
+          loading: () => const LoadingView(),
+          error: (e, _) => ErrorView(error: e),
           data: (list) => list.isEmpty
-              ? const Center(child: Text('No payroll runs yet'))
+              ? const EmptyState(icon: Icons.account_balance_wallet_outlined, title: 'No payroll runs yet')
               : ListView.separated(
                   padding: const EdgeInsets.all(12),
                   itemCount: list.length,

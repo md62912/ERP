@@ -4,6 +4,17 @@ import 'package:go_router/go_router.dart';
 import '../../providers/project_provider.dart';
 import '../../../domain/entities/project.dart';
 import '../../../core/utils/formatters.dart';
+import '../../shared/widgets/async_states.dart';
+import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/status_pill.dart';
+
+Color _projectStatusColor(ProjectStatus s) => switch (s) {
+      ProjectStatus.planning => Colors.blueGrey,
+      ProjectStatus.active => Colors.green,
+      ProjectStatus.onHold => Colors.orange,
+      ProjectStatus.completed => Colors.teal,
+      ProjectStatus.cancelled => Colors.red,
+    };
 
 class ProjectListScreen extends ConsumerWidget {
   const ProjectListScreen({super.key});
@@ -17,14 +28,14 @@ class ProjectListScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(projectListProvider),
         child: projects.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Failed to load projects: $e')),
+          loading: () => const LoadingView(),
+          error: (e, _) => ErrorView(error: e),
           data: (list) => list.isEmpty
-              ? const Center(child: Text('No projects yet'))
+              ? const EmptyState(icon: Icons.folder_open_outlined, title: 'No projects yet')
               : ListView.separated(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, i) => _ProjectCard(project: list[i]),
                 ),
         ),
@@ -43,51 +54,77 @@ class _ProjectCard extends StatelessWidget {
   final Project project;
   const _ProjectCard({required this.project});
 
-  Color _statusColor(ProjectStatus s) => switch (s) {
-        ProjectStatus.planning => Colors.blueGrey,
-        ProjectStatus.active => Colors.green,
-        ProjectStatus.onHold => Colors.orange,
-        ProjectStatus.completed => Colors.teal,
-        ProjectStatus.cancelled => Colors.red,
-      };
-
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(project.status);
+    final color = _projectStatusColor(project.status);
     return Card(
-      child: ListTile(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: () => context.push('/projects/${project.id}'),
-        title: Text(project.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (project.description != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(12)),
+                    child: Icon(Icons.folder_special_rounded, color: color, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(project.name, style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  StatusPill(label: project.status.name, color: color),
+                ],
+              ),
+              if (project.description != null) ...[
+                const SizedBox(height: 10),
+                Text(
                   project.description!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                if (project.endDate != null)
-                  Text('Due ${Formatters.date(project.endDate)}', style: const TextStyle(fontSize: 12)),
               ],
-            ),
-          ],
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-          child: Text(
-            project.status.name,
-            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+              if (project.endDate != null || project.budget != null) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (project.endDate != null)
+                      _MetaChip(icon: Icons.event_outlined, label: 'Due ${Formatters.date(project.endDate)}'),
+                    if (project.budget != null)
+                      _MetaChip(icon: Icons.attach_money_rounded, label: Formatters.currency(project.budget)),
+                  ],
+                ),
+              ],
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _MetaChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Theme.of(context).textTheme.bodySmall?.color),
+        const SizedBox(width: 4),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
     );
   }
 }

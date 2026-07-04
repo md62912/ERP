@@ -4,6 +4,16 @@ import '../../providers/project_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/entities/project.dart';
+import '../../shared/widgets/async_states.dart';
+import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/status_pill.dart';
+
+Color _priorityColor(TaskPriority p) => switch (p) {
+      TaskPriority.low => Colors.blueGrey,
+      TaskPriority.medium => Colors.blue,
+      TaskPriority.high => Colors.orange,
+      TaskPriority.urgent => Colors.red,
+    };
 
 class MyTasksScreen extends ConsumerWidget {
   const MyTasksScreen({super.key});
@@ -24,6 +34,14 @@ class MyTasksScreen extends ConsumerWidget {
     TaskStatus.done: 'Done',
   };
 
+  static const _statusIcons = {
+    TaskStatus.todo: Icons.radio_button_unchecked,
+    TaskStatus.inProgress: Icons.autorenew_rounded,
+    TaskStatus.inReview: Icons.rate_review_outlined,
+    TaskStatus.blocked: Icons.block_rounded,
+    TaskStatus.done: Icons.check_circle_rounded,
+  };
+
   Future<void> _logTime(BuildContext context, WidgetRef ref, ProjectTask task) async {
     final hoursCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
@@ -40,6 +58,7 @@ class MyTasksScreen extends ConsumerWidget {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(labelText: 'Hours'),
             ),
+            const SizedBox(height: 8),
             TextField(
               controller: noteCtrl,
               decoration: const InputDecoration(labelText: 'Note (optional)'),
@@ -69,13 +88,6 @@ class MyTasksScreen extends ConsumerWidget {
     );
   }
 
-  Color _priorityColor(TaskPriority p) => switch (p) {
-        TaskPriority.low => Colors.grey,
-        TaskPriority.medium => Colors.blue,
-        TaskPriority.high => Colors.orange,
-        TaskPriority.urgent => Colors.red,
-      };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksAsync = ref.watch(myTasksProvider);
@@ -85,45 +97,61 @@ class MyTasksScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(myTasksProvider),
         child: tasksAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Failed to load tasks: $e')),
+          loading: () => const LoadingView(),
+          error: (e, _) => ErrorView(error: e),
           data: (tasks) {
             if (tasks.isEmpty) {
-              return const Center(child: Text('No tasks assigned to you'));
+              return const EmptyState(icon: Icons.task_alt_rounded, title: 'No tasks assigned to you');
             }
             final grouped = {
               for (final s in _statusOrder) s: tasks.where((t) => t.status == s).toList(),
             };
             return ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               children: [
                 for (final status in _statusOrder)
                   if (grouped[status]!.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                      child: Text(
-                        '${_statusLabels[status]} (${grouped[status]!.length})',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color, fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                      child: Row(
+                        children: [
+                          Icon(_statusIcons[status], size: 16, color: Theme.of(context).textTheme.bodySmall?.color),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_statusLabels[status]} · ${grouped[status]!.length}',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ],
                       ),
                     ),
                     for (final task in grouped[status]!)
-                      ListTile(
-                        leading: CircleAvatar(radius: 6, backgroundColor: _priorityColor(task.priority)),
-                        title: Text(task.title),
-                        subtitle: task.dueDate != null ? Text('Due ${Formatters.date(task.dueDate)}') : null,
-                        trailing: IconButton(
-                          icon: const Icon(Icons.timer_outlined),
-                          tooltip: 'Log time',
-                          onPressed: () => _logTime(context, ref, task),
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Container(
+                            width: 4,
+                            height: 36,
+                            decoration: BoxDecoration(color: _priorityColor(task.priority), borderRadius: BorderRadius.circular(2)),
+                          ),
+                          title: Text(task.title, style: Theme.of(context).textTheme.titleSmall),
+                          subtitle: task.dueDate != null ? Text('Due ${Formatters.date(task.dueDate)}') : null,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              StatusPill(label: task.priority.name, color: _priorityColor(task.priority)),
+                              IconButton(
+                                icon: const Icon(Icons.timer_outlined, size: 20),
+                                tooltip: 'Log time',
+                                onPressed: () => _logTime(context, ref, task),
+                              ),
+                            ],
+                          ),
+                          onTap: () async {
+                            final nextIndex = (_statusOrder.indexOf(task.status) + 1).clamp(0, _statusOrder.length - 1);
+                            await ref.read(taskRepositoryProvider).updateStatus(task.id, _statusOrder[nextIndex]);
+                            ref.invalidate(myTasksProvider);
+                          },
                         ),
-                        onTap: () async {
-                          final nextIndex = (_statusOrder.indexOf(task.status) + 1).clamp(0, _statusOrder.length - 1);
-                          await ref.read(taskRepositoryProvider).updateStatus(task.id, _statusOrder[nextIndex]);
-                          ref.invalidate(myTasksProvider);
-                        },
                       ),
                   ],
               ],

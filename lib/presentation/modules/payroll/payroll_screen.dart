@@ -4,6 +4,9 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../../domain/entities/employee.dart';
 import '../../providers/auth_provider.dart';
+import '../../shared/widgets/async_states.dart';
+import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/status_pill.dart';
 import 'payroll_admin_screen.dart';
 
 final _myPayslipsProvider = FutureProvider.autoDispose((ref) async {
@@ -18,8 +21,15 @@ final _myPayslipsProvider = FutureProvider.autoDispose((ref) async {
 });
 
 const _monthNames = [
-  '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  '', 'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+Color _payslipStatusColor(String status) => switch (status) {
+      'sent' => Colors.blue,
+      'acknowledged' => Colors.green,
+      _ => Colors.orange,
+    };
 
 class PayrollScreen extends ConsumerWidget {
   const PayrollScreen({super.key});
@@ -45,29 +55,61 @@ class PayrollScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: payslips.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load payslips: $e')),
-        data: (rows) => rows.isEmpty
-            ? const Center(child: Text('No payslips yet'))
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: rows.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, i) {
-                  final r = rows[i];
-                  final run = r['payroll_runs'] as Map?;
-                  final month = run?['month'] as int?;
-                  final year = run?['year'];
-                  return Card(
-                    child: ListTile(
-                      title: Text(month == null ? 'Payslip' : '${_monthNames[month]} $year'),
-                      subtitle: Text('Net pay: ${Formatters.currency(r['net_salary'])}'),
-                      trailing: Chip(label: Text(r['status'] as String? ?? '')),
-                    ),
-                  );
-                },
-              ),
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(_myPayslipsProvider),
+        child: payslips.when(
+          loading: () => const LoadingView(),
+          error: (e, _) => ErrorView(error: e),
+          data: (rows) => rows.isEmpty
+              ? const EmptyState(icon: Icons.receipt_long_outlined, title: 'No payslips yet')
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: rows.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, i) {
+                    final r = rows[i];
+                    final run = r['payroll_runs'] as Map?;
+                    final month = run?['month'] as int?;
+                    final year = run?['year'];
+                    final status = r['status'] as String? ?? 'generated';
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.receipt_long_rounded, color: Theme.of(context).colorScheme.primary),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    month == null ? 'Payslip' : '${_monthNames[month]} $year',
+                                    style: Theme.of(context).textTheme.titleSmall,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Net pay: ${Formatters.currency(r['net_salary'])}',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            StatusPill(label: status, color: _payslipStatusColor(status)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
       ),
     );
   }

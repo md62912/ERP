@@ -7,7 +7,16 @@ import '../../providers/auth_provider.dart';
 import '../../providers/document_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/entities/employee.dart';
+import '../../shared/widgets/async_states.dart';
+import '../../shared/widgets/status_pill.dart';
 import 'employee_form_screen.dart';
+
+Color _employeeStatusColor(EmployeeStatus status) => switch (status) {
+      EmployeeStatus.active => Colors.green,
+      EmployeeStatus.onLeave => Colors.orange,
+      EmployeeStatus.inactive => Colors.grey,
+      EmployeeStatus.terminated => Colors.red,
+    };
 
 class EmployeeDetailScreen extends ConsumerWidget {
   final String employeeId;
@@ -25,11 +34,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
     if (file == null || file.bytes == null) return;
 
     try {
-      await ref.read(documentActionsProvider).upload(
-            employeeId: employeeId,
-            fileName: file.name,
-            bytes: file.bytes!,
-          );
+      await ref.read(documentActionsProvider).upload(employeeId: employeeId, fileName: file.name, bytes: file.bytes!);
       ref.invalidate(employeeDocumentsProvider(employeeId));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document uploaded')));
@@ -79,41 +84,61 @@ class EmployeeDetailScreen extends ConsumerWidget {
         ],
       ),
       body: employeeAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load employee: $e')),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e),
         data: (employee) {
           final canManage = _canManage(ref, employee);
           final documents = ref.watch(employeeDocumentsProvider(employeeId));
+          final statusColor = _employeeStatusColor(employee.status);
 
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Center(
-                child: CircleAvatar(
-                  radius: 40,
-                  child: Text(
-                    employee.firstName.substring(0, 1).toUpperCase(),
-                    style: const TextStyle(fontSize: 28),
+              // Header card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 36,
+                        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                        child: Text(
+                          employee.firstName.substring(0, 1).toUpperCase(),
+                          style: TextStyle(fontSize: 26, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(employee.fullName, style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 4),
+                      Text(employee.designation ?? employee.role.name, style: Theme.of(context).textTheme.bodyMedium),
+                      const SizedBox(height: 10),
+                      StatusPill(label: employee.status.name, color: statusColor),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: Text(employee.fullName, style: Theme.of(context).textTheme.titleLarge),
-              ),
-              Center(
-                child: Text(
-                  employee.designation ?? employee.role.name,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
+
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Column(
+                    children: [
+                      _InfoRow(icon: Icons.badge_outlined, label: 'Employee Code', value: employee.empCode),
+                      const Divider(height: 1),
+                      _InfoRow(icon: Icons.email_outlined, label: 'Email', value: employee.email),
+                      const Divider(height: 1),
+                      _InfoRow(icon: Icons.phone_outlined, label: 'Phone', value: employee.phone ?? '-'),
+                      const Divider(height: 1),
+                      _InfoRow(icon: Icons.calendar_today_outlined, label: 'Join Date', value: Formatters.date(employee.joinDate)),
+                      const Divider(height: 1),
+                      _InfoRow(icon: Icons.work_outline, label: 'Employment Type', value: employee.employmentType?.name ?? '-'),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
-              _InfoTile(label: 'Employee Code', value: employee.empCode),
-              _InfoTile(label: 'Email', value: employee.email),
-              _InfoTile(label: 'Phone', value: employee.phone ?? '-'),
-              _InfoTile(label: 'Join Date', value: Formatters.date(employee.joinDate)),
-              _InfoTile(label: 'Employment Type', value: employee.employmentType?.name ?? '-'),
-              _InfoTile(label: 'Status', value: employee.status.name),
+
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -122,34 +147,45 @@ class EmployeeDetailScreen extends ConsumerWidget {
                   if (canManage)
                     TextButton.icon(
                       onPressed: () => _uploadDocument(context, ref, employeeId),
-                      icon: const Icon(Icons.upload_file_outlined),
+                      icon: const Icon(Icons.upload_file_outlined, size: 18),
                       label: const Text('Upload'),
                     ),
                 ],
               ),
+              const SizedBox(height: 8),
               documents.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (e, _) => Text('Could not load documents: $e'),
+                loading: () => const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: LoadingView()),
+                error: (e, _) => ErrorView(error: e),
                 data: (docs) => docs.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text('No documents uploaded yet'),
+                    ? Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Center(
+                            child: Text('No documents uploaded yet', style: Theme.of(context).textTheme.bodySmall),
+                          ),
+                        ),
                       )
-                    : Column(
-                        children: [
-                          for (final doc in docs)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.insert_drive_file_outlined),
-                              title: Text(doc.docType ?? 'Document'),
-                              subtitle: Text(Formatters.date(doc.uploadedAt)),
-                              trailing: const Icon(Icons.open_in_new, size: 18),
-                              onTap: () => _openDocument(context, ref, doc),
-                            ),
-                        ],
+                    : Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          children: [
+                            for (final doc in docs)
+                              ListTile(
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.insert_drive_file_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+                                ),
+                                title: Text(doc.docType ?? 'Document', style: Theme.of(context).textTheme.titleSmall),
+                                subtitle: Text(Formatters.date(doc.uploadedAt)),
+                                trailing: const Icon(Icons.open_in_new, size: 18),
+                                onTap: () => _openDocument(context, ref, doc),
+                              ),
+                          ],
+                        ),
                       ),
               ),
             ],
@@ -160,22 +196,24 @@ class EmployeeDetailScreen extends ConsumerWidget {
   }
 }
 
-class _InfoTile extends StatelessWidget {
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
-  const _InfoTile({required this.label, required this.value});
+  const _InfoRow({required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
+          Icon(icon, size: 18, color: Theme.of(context).textTheme.bodySmall?.color),
+          const SizedBox(width: 12),
           Expanded(
-            flex: 2,
-            child: Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+            child: Text(label, style: Theme.of(context).textTheme.bodySmall),
           ),
-          Expanded(flex: 3, child: Text(value)),
+          Text(value, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 
 /// Creates an auth account only. There's deliberately no employee-table
@@ -20,6 +21,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _loading = false;
+  bool _obscure = true;
   String? _error;
   bool _done = false;
 
@@ -71,28 +73,45 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           TextFormField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Work email'),
+            decoration: const InputDecoration(labelText: 'Work email', prefixIcon: Icon(Icons.email_outlined, size: 20)),
             validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           TextFormField(
             controller: _passwordCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password'),
+            obscureText: _obscure,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline, size: 20),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
             validator: (v) => (v == null || v.length < 6) ? 'Min 6 characters' : null,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           TextFormField(
             controller: _confirmCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Confirm password'),
+            obscureText: _obscure,
+            decoration: const InputDecoration(labelText: 'Confirm password', prefixIcon: Icon(Icons.lock_outline, size: 20)),
             validator: (v) => v != _passwordCtrl.text ? 'Passwords do not match' : null,
           ),
           if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AppColors.danger.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.danger, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 13))),
+                ],
+              ),
+            ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           ElevatedButton(
             onPressed: _loading ? null : _submit,
             child: _loading
@@ -114,8 +133,12 @@ class _SuccessMessage extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.mark_email_read_outlined, size: 56, color: Colors.green),
-        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: AppColors.success.withOpacity(0.1), shape: BoxShape.circle),
+          child: const Icon(Icons.mark_email_read_outlined, size: 40, color: AppColors.success),
+        ),
+        const SizedBox(height: 20),
         Text('Check your email', style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
         const SizedBox(height: 8),
         Text(

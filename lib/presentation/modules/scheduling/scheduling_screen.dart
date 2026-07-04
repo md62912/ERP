@@ -4,6 +4,8 @@ import '../../providers/schedule_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/entities/project.dart';
+import '../../shared/widgets/async_states.dart';
+import '../../shared/widgets/empty_state.dart';
 
 class SchedulingScreen extends ConsumerWidget {
   const SchedulingScreen({super.key});
@@ -110,6 +112,14 @@ class SchedulingScreen extends ConsumerWidget {
         _ => Icons.event_outlined,
       };
 
+  Color _colorFor(String type) => switch (type) {
+        'meeting' => Colors.blue,
+        'shift' => Colors.teal,
+        'deadline' => Colors.red,
+        'reminder' => Colors.orange,
+        _ => Colors.blueGrey,
+      };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final events = ref.watch(myUpcomingEventsProvider);
@@ -119,25 +129,74 @@ class SchedulingScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(myUpcomingEventsProvider),
         child: events.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Failed to load schedule: $e')),
+          loading: () => const LoadingView(),
+          error: (e, _) => ErrorView(error: e),
           data: (list) => list.isEmpty
-              ? const Center(child: Text('No upcoming events'))
+              ? const EmptyState(icon: Icons.event_available_outlined, title: 'No upcoming events')
               : ListView.separated(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, i) {
                     final e = list[i];
+                    final color = _colorFor(e.eventType);
                     return Card(
-                      child: ListTile(
-                        leading: Icon(_iconFor(e.eventType)),
-                        title: Text(e.title),
-                        subtitle: Text(
-                          '${Formatters.date(e.startTime)} · ${Formatters.time(e.startTime)} – ${Formatters.time(e.endTime)}'
-                          '${e.location != null ? '\n${e.location}' : ''}',
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 52,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    e.startTime.day.toString(),
+                                    style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 18),
+                                  ),
+                                  Text(
+                                    Formatters.date(e.startTime).split(' ')[1].toUpperCase(),
+                                    style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(_iconFor(e.eventType), size: 16, color: color),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(e.title, style: Theme.of(context).textTheme.titleSmall),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${Formatters.time(e.startTime)} – ${Formatters.time(e.endTime)}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  if (e.location != null) ...[
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.place_outlined, size: 13, color: Theme.of(context).textTheme.bodySmall?.color),
+                                        const SizedBox(width: 4),
+                                        Text(e.location!, style: Theme.of(context).textTheme.bodySmall),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        isThreeLine: e.location != null,
                       ),
                     );
                   },
