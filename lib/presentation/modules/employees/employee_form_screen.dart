@@ -29,6 +29,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       TextEditingController(text: widget.existing?.salary?.toStringAsFixed(2));
 
   late String? _departmentId = widget.existing?.departmentId;
+  late String? _managerId = widget.existing?.managerId;
   late UserRole _role = widget.existing?.role ?? UserRole.employee;
   late EmploymentType _employmentType = widget.existing?.employmentType ?? EmploymentType.fullTime;
   late EmployeeStatus _status = widget.existing?.status ?? EmployeeStatus.active;
@@ -50,6 +51,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       departmentId: _departmentId,
       designation: _designationCtrl.text.trim().isEmpty ? null : _designationCtrl.text.trim(),
       role: _role,
+      managerId: _managerId,
       employmentType: _employmentType,
       joinDate: _joinDate,
       status: _status,
@@ -79,6 +81,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   @override
   Widget build(BuildContext context) {
     final departments = ref.watch(departmentListProvider);
+    final employeeListForManager = ref.watch(employeeListProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.isEdit ? 'Edit Employee' : 'New Employee')),
@@ -142,14 +145,48 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _designationCtrl,
-              decoration: const InputDecoration(labelText: 'Designation (e.g. Software Engineer)'),
+              decoration: const InputDecoration(
+                labelText: 'Designation',
+                hintText: 'e.g. Project Engineer, Site Engineer, Technician',
+              ),
+            ),
+            const SizedBox(height: 12),
+            employeeListForManager.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('Could not load employees: $e'),
+              data: (list) {
+                // Can't report to yourself, and (when editing) can't
+                // report to someone who already reports to you --
+                // simple cycle guard for the common one-level case.
+                final candidates = list.where((e) => e.id != widget.existing?.id).toList();
+                return DropdownButtonFormField<String?>(
+                  value: _managerId,
+                  decoration: const InputDecoration(labelText: 'Reports to (optional)'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('— No manager / top of hierarchy —')),
+                    for (final e in candidates)
+                      DropdownMenuItem(value: e.id, child: Text('${e.fullName} (${e.designation ?? e.role.name})')),
+                  ],
+                  onChanged: (v) => setState(() => _managerId = v),
+                );
+              },
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<UserRole>(
               value: _role,
-              decoration: const InputDecoration(labelText: 'System role'),
+              decoration: const InputDecoration(labelText: 'System role (access level)'),
               items: [for (final r in UserRole.values) DropdownMenuItem(value: r, child: Text(r.name))],
               onChanged: (v) => setState(() => _role = v!),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4),
+              child: Text(
+                '"Manager" here means broad company-wide visibility (similar to HR/Admin). '
+                'Leave approval for direct reports works automatically from "Reports to" below, '
+                'regardless of this setting -- e.g. a Site Engineer with role "employee" can '
+                'still approve their own Technicians\' leave. Job title goes in Designation above.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<EmploymentType>(

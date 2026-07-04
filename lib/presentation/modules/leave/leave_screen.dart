@@ -121,7 +121,12 @@ class LeaveScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(currentUserRoleProvider);
-    final canApprove = role == UserRole.admin || role == UserRole.hr || role == UserRole.manager;
+    final hasDirectReports = ref.watch(hasDirectReportsProvider).valueOrNull ?? false;
+    // hr/admin always get the Approvals tab (RLS lets them see everyone's
+    // requests); anyone else gets it only if they actually have direct
+    // reports -- e.g. a Site Engineer supervising Technicians, even
+    // though their system role is plain "employee".
+    final canApprove = role == UserRole.admin || role == UserRole.hr || role == UserRole.manager || hasDirectReports;
 
     if (!canApprove) {
       return Scaffold(

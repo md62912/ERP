@@ -199,9 +199,15 @@ class _TasksTab extends ConsumerWidget {
               cardBuilder: (context, task) => _buildCard(context, task),
               onStatusChanged: (task, newStatus) async {
                 if (task.status == newStatus) return;
-                await ref.read(taskRepositoryProvider).updateStatus(task.id, newStatus);
-                ref.invalidate(projectTasksProvider(projectId));
-                ref.invalidate(myTasksProvider);
+                try {
+                  await ref.read(taskRepositoryProvider).updateStatus(task.id, newStatus);
+                  ref.invalidate(projectTasksProvider(projectId));
+                  ref.invalidate(myTasksProvider);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("You don't have permission to update tasks on this project")),
+                  );
+                }
               },
             ),
     );

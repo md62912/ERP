@@ -1,5 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/supabase/supabase_client.dart';
+import 'auth_provider.dart';
+
+/// Whether the signed-in employee has anyone reporting to them --
+/// independent of their system `role`. This is what actually determines
+/// whether someone can approve leave (Postgres RLS keys off `manager_id`,
+/// not off role='manager'), so a Site Engineer with role 'employee' who
+/// supervises Technicians still needs to see the Approvals tab.
+final hasDirectReportsProvider = FutureProvider.autoDispose<bool>((ref) async {
+  final me = await ref.watch(currentEmployeeProvider.future);
+  if (me == null) return false;
+  final count = await SupabaseService.client.from(Tables.employees).count().eq('manager_id', me.id);
+  return count > 0;
+});
 
 /// Pending leave requests visible to the signed-in manager/hr/admin.
 /// RLS already scopes this correctly: managers see their direct reports'
