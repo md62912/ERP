@@ -20,7 +20,22 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
 /// value because the live fetch failed (almost always: no network).
 /// Screens can watch this to show a small "offline" indicator instead of
 /// pretending the (possibly stale) data is current.
-final isShowingCachedDataProvider = StateProvider<bool>((ref) => false);
+/// Tracks whether the most recent profile resolution came from the
+/// offline cache. Written only from inside currentEmployeeProvider's async
+/// body (never touching another provider mid-build, which Riverpod
+/// forbids and which previously caused the dashboard to hang), and read
+/// back through [isShowingCachedDataProvider].
+bool _lastProfileFromCache = false;
+
+/// Whether the dashboard is currently showing a cached (offline) profile.
+/// Derived by watching the employee provider so it recomputes whenever the
+/// profile resolves, without any provider mutating another during build.
+final isShowingCachedDataProvider = Provider<bool>((ref) {
+  final employee = ref.watch(currentEmployeeProvider);
+  // Only meaningful once a value has resolved; while loading/erroring we
+  // report "not cached" so no stale banner flashes.
+  return employee.hasValue && employee.value != null && _lastProfileFromCache;
+});
 
 const _cachedProfileKey = 'employee_profile';
 
@@ -36,15 +51,19 @@ final currentEmployeeProvider = FutureProvider<Employee?>((ref) async {
   if (SupabaseService.currentUser == null) return null;
   try {
     final employee = await EmployeeRepositoryImpl().getMyProfile();
-    await LocalCache.setJsonWithTimestamp(_cachedProfileKey, employee.toJson());
-    ref.read(isShowingCachedDataProvider.notifier).state = false;
+    // Best-effort cache write; must never break the profile load.
+    try {
+      await LocalCache.setJsonWithTimestamp(_cachedProfileKey, employee.toJson());
+    } catch (_) {}
+    _lastProfileFromCache = false;
     return employee;
   } catch (_) {
     final cached = LocalCache.getMap(_cachedProfileKey);
     if (cached != null) {
-      ref.read(isShowingCachedDataProvider.notifier).state = true;
+      _lastProfileFromCache = true;
       return Employee.fromJson(cached);
     }
+    _lastProfileFromCache = false;
     return null;
   }
 });
