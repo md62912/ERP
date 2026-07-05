@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/utils/attendance_rules.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/profile_guard.dart';
@@ -368,15 +369,60 @@ class _AttendanceRow extends StatelessWidget {
   final Map<String, dynamic> row;
   const _AttendanceRow({required this.row});
 
+  Future<void> _showLocationDetail(BuildContext context) async {
+    final lat = (row['latitude'] as num?)?.toDouble();
+    final lon = (row['longitude'] as num?)?.toDouble();
+    if (lat == null || lon == null) return;
+    final flagged = row['location_flagged'] == true;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Check-in location'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (flagged)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                child: const Text(
+                  "This was outside the expected range of your assigned project site.",
+                  style: TextStyle(color: Colors.red, fontSize: 13),
+                ),
+              ),
+            Text('Latitude: ${lat.toStringAsFixed(6)}'),
+            Text('Longitude: ${lon.toStringAsFixed(6)}'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          ElevatedButton.icon(
+            onPressed: () {
+              launchUrl(Uri.parse('https://www.google.com/maps?q=$lat,$lon'), mode: LaunchMode.externalApplication);
+            },
+            icon: const Icon(Icons.map_outlined, size: 18),
+            label: const Text('Open in Maps'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final date = DateTime.parse(row['date'] as String);
     final status = row['status'] as String? ?? 'present';
     final workHours = (row['work_hours'] as num?)?.toDouble();
     final color = AttendanceRules.color(status);
+    final hasLocation = row['latitude'] != null;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: hasLocation ? () => _showLocationDetail(context) : null,
         leading: CircleAvatar(
           backgroundColor: color.withOpacity(0.14),
           child: Text('${date.day}', style: TextStyle(color: color, fontWeight: FontWeight.w700)),
@@ -395,7 +441,16 @@ class _AttendanceRow extends StatelessWidget {
           'Out: ${row['check_out'] != null ? Formatters.time(DateTime.parse(row['check_out'])) : '-'}'
           '${workHours != null && workHours > 0 ? '   ·   ${workHours}h' : ''}',
         ),
-        trailing: StatusPill(label: AttendanceRules.label(status), color: color),
+        trailing: hasLocation
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StatusPill(label: AttendanceRules.label(status), color: color),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                ],
+              )
+            : StatusPill(label: AttendanceRules.label(status), color: color),
       ),
     );
   }

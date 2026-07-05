@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/utils/attendance_rules.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/services/attendance_export.dart';
@@ -211,6 +212,49 @@ class _RosterRow extends StatelessWidget {
   final Map<String, dynamic>? row;
   const _RosterRow({required this.employee, required this.row});
 
+  Future<void> _showLocationDetail(BuildContext context) async {
+    final lat = (row?['latitude'] as num?)?.toDouble();
+    final lon = (row?['longitude'] as num?)?.toDouble();
+    if (lat == null || lon == null) return;
+    final flagged = row?['location_flagged'] == true;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Check-in location'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (flagged)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                child: const Text(
+                  "Outside the expected range of every project this person is assigned to.",
+                  style: TextStyle(color: Colors.red, fontSize: 13),
+                ),
+              ),
+            Text('Latitude: ${lat.toStringAsFixed(6)}'),
+            Text('Longitude: ${lon.toStringAsFixed(6)}'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          ElevatedButton.icon(
+            onPressed: () {
+              launchUrl(Uri.parse('https://www.google.com/maps?q=$lat,$lon'), mode: LaunchMode.externalApplication);
+            },
+            icon: const Icon(Icons.map_outlined, size: 18),
+            label: const Text('Open in Maps'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = '${employee['first_name']} ${employee['last_name']}';
@@ -220,10 +264,12 @@ class _RosterRow extends StatelessWidget {
     final checkIn = row?['check_in'] != null ? Formatters.time(DateTime.parse(row!['check_in'])) : '-';
     final checkOut = row?['check_out'] != null ? Formatters.time(DateTime.parse(row!['check_out'])) : '-';
     final hours = (row?['work_hours'] as num?)?.toDouble();
+    final hasLocation = row?['latitude'] != null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: hasLocation ? () => _showLocationDetail(context) : null,
         leading: CircleAvatar(
           backgroundColor: color.withOpacity(0.14),
           child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: color, fontWeight: FontWeight.w700)),
@@ -241,7 +287,16 @@ class _RosterRow extends StatelessWidget {
           '${designation ?? ''}${designation != null ? ' · ' : ''}In: $checkIn  Out: $checkOut'
           '${hours != null && hours > 0 ? '  ·  ${hours}h' : ''}',
         ),
-        trailing: StatusPill(label: AttendanceRules.label(status), color: color),
+        trailing: hasLocation
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StatusPill(label: AttendanceRules.label(status), color: color),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                ],
+              )
+            : StatusPill(label: AttendanceRules.label(status), color: color),
       ),
     );
   }
