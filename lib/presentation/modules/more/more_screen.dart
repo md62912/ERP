@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 import '../../../domain/entities/employee.dart';
 import '../payroll/payroll_admin_screen.dart';
+import '../settings/settings_screen.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -18,6 +19,7 @@ class MoreScreen extends ConsumerWidget {
       (icon: Icons.checklist_rounded, label: 'My Tasks', path: '/tasks', color: Colors.teal),
       (icon: Icons.calendar_month_outlined, label: 'Schedule', path: '/scheduling', color: Colors.deepOrange),
       (icon: Icons.handshake_outlined, label: 'CRM', path: '/crm', color: Colors.purple),
+      (icon: Icons.settings_outlined, label: 'Settings', path: '__settings', color: Colors.blueGrey),
       if (canManage)
         (icon: Icons.admin_panel_settings_outlined, label: 'Payroll Admin', path: '__payroll_admin', color: Colors.brown),
     ];
@@ -36,9 +38,15 @@ class MoreScreen extends ConsumerWidget {
               icon: tile.icon,
               label: tile.label,
               color: tile.color,
-              onTap: () => tile.path == '__payroll_admin'
-                  ? Navigator.push(context, MaterialPageRoute(builder: (_) => const PayrollAdminScreen()))
-                  : context.push(tile.path),
+              onTap: () {
+                if (tile.path == '__payroll_admin') {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PayrollAdminScreen()));
+                } else if (tile.path == '__settings') {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                } else {
+                  context.push(tile.path);
+                }
+              },
             ),
         ],
       ),

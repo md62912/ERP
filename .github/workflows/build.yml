@@ -88,7 +88,7 @@ jobs:
       - name: Generate app icons
         run: dart run flutter_launcher_icons
 
-      - name: Ensure INTERNET and location permissions are declared
+      - name: Ensure INTERNET, location, and biometric permissions are declared
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
           if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
@@ -104,7 +104,20 @@ jobs:
           else
             echo "Location permissions already present"
           fi
+          if ! grep -q 'android.permission.USE_BIOMETRIC' "$MANIFEST"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.USE_BIOMETRIC" />' "$MANIFEST"
+            echo "Added missing USE_BIOMETRIC permission"
+          else
+            echo "USE_BIOMETRIC permission already present"
+          fi
           cat "$MANIFEST"
+
+      - name: Switch MainActivity to FlutterFragmentActivity (required by local_auth)
+        run: |
+          MAINACTIVITY=$(find android/app/src/main/kotlin -name "MainActivity.kt")
+          echo "Patching $MAINACTIVITY"
+          sed -i 's/FlutterActivity/FlutterFragmentActivity/g' "$MAINACTIVITY"
+          cat "$MAINACTIVITY"
 
       - name: Apply branding to Android scaffold
         run: |

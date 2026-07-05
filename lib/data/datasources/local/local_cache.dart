@@ -55,4 +55,15 @@ class LocalCache {
     await setJson(key, value);
     await _box?.put('$key.__updated_at', DateTime.now().toIso8601String());
   }
+
+  /// Simple boolean device preference (e.g. "biometric lock enabled").
+  static bool getBool(String key, {bool defaultValue = false}) {
+    final raw = _box?.get(key);
+    if (raw == null) return defaultValue;
+    return raw == 'true';
+  }
+
+  static Future<void> setBool(String key, bool value) async {
+    await _box?.put(key, value.toString());
+  }
 }

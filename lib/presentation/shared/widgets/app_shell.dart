@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/biometric_provider.dart';
+import 'biometric_lock_screen.dart';
 import 'responsive_body.dart';
 
 /// Shared bottom-nav shell. Wraps every authenticated screen so the tab
 /// bar persists across navigation (state is preserved per GoRouter's
 /// ShellRoute behavior).
-class AppShell extends StatelessWidget {
+///
+/// Also hosts the biometric-lock gate: if enabled and this process hasn't
+/// been unlocked yet, shows BiometricLockScreen instead of the shell
+/// content. This sits here (rather than in the router's redirect logic)
+/// because the lock is a cold-start overlay on top of an already-valid
+/// session, not a routing decision -- the person IS authenticated, the
+/// gate just hasn't been passed yet this app launch.
+class AppShell extends ConsumerWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
 
@@ -32,7 +42,13 @@ class AppShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lockEnabled = ref.watch(biometricLockEnabledProvider);
+    final unlocked = ref.watch(appUnlockedThisSessionProvider);
+    if (lockEnabled && !unlocked) {
+      return const BiometricLockScreen();
+    }
+
     final currentIndex = _currentIndex(context);
     return Scaffold(
       body: ResponsiveBody(child: child),
