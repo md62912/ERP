@@ -35,6 +35,15 @@ jobs:
           sed -i 's/<title>.*<\/title>/<title>Xebec Trading Services - HRM ERP<\/title>/' web/index.html
           sed -i 's/"name": ".*"/"name": "Xebec Trading Services HRM ERP"/' web/manifest.json
           sed -i 's/"short_name": ".*"/"short_name": "Xebec ERP"/' web/manifest.json
+          # iOS "Add to Home Screen" reads these Apple-specific meta tags
+          # directly (not the web manifest) to decide the home-screen icon
+          # label and whether it launches full-screen without Safari's
+          # browser chrome. Flutter's default template already includes
+          # them, defaulted to the raw project name -- patch that to the
+          # real brand name, same as the Android launcher label and web
+          # <title> above.
+          sed -i 's/apple-mobile-web-app-title" content=".*"/apple-mobile-web-app-title" content="Xebec ERP"/' web/index.html
+          sed -i 's/name="theme-color" content="#[0-9A-Fa-f]*"/name="theme-color" content="#6366F1"/' web/index.html
 
       - name: Build web
         run: flutter build web --release --base-href /${{ github.event.repository.name }}/
