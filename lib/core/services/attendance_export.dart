@@ -43,9 +43,12 @@ Future<void> exportAttendanceCsv({
   }
 
   final bytes = utf8.encode(buffer.toString());
+  // share_plus 7.2.2's shareXFiles doesn't support fileNameOverrides (added
+  // in a later major version). Pass the name via XFile.fromData's `name`
+  // instead -- honored on web (the download filename), ignored on native
+  // where the OS names the temp file, which is acceptable.
   await Share.shareXFiles(
-    [XFile.fromData(bytes, mimeType: 'text/csv')],
-    fileNameOverrides: ['attendance_$dateStr.csv'],
+    [XFile.fromData(bytes, mimeType: 'text/csv', name: 'attendance_$dateStr.csv')],
     subject: 'Attendance report $dateStr',
   );
 }
