@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/leave_approval_provider.dart';
@@ -97,7 +98,10 @@ class LeaveScreen extends ConsumerWidget {
                   ? null
                   : () async {
                       final me = await ref.read(currentEmployeeProvider.future);
-                      if (me == null) return;
+                      if (me == null) {
+                        notifyProfileNotReady(context);
+                        return;
+                      }
                       final days = range!.end.difference(range!.start).inDays + 1;
                       await SupabaseService.client.from(Tables.leaveRequests).insert({
                         'employee_id': me.id,
@@ -301,7 +305,10 @@ class _ApprovalsTab extends ConsumerWidget {
                                   label: const Text('Reject'),
                                   onPressed: () async {
                                     final me = await ref.read(currentEmployeeProvider.future);
-                                    if (me == null) return;
+                                    if (me == null) {
+                                      notifyProfileNotReady(context);
+                                      return;
+                                    }
                                     await ref.read(leaveApprovalActionsProvider).decide(r['id'] as String, approve: false, approverId: me.id);
                                     ref.invalidate(teamLeaveRequestsProvider);
                                   },
@@ -315,7 +322,10 @@ class _ApprovalsTab extends ConsumerWidget {
                                   label: const Text('Approve'),
                                   onPressed: () async {
                                     final me = await ref.read(currentEmployeeProvider.future);
-                                    if (me == null) return;
+                                    if (me == null) {
+                                      notifyProfileNotReady(context);
+                                      return;
+                                    }
                                     await ref.read(leaveApprovalActionsProvider).decide(r['id'] as String, approve: true, approverId: me.id);
                                     ref.invalidate(teamLeaveRequestsProvider);
                                   },

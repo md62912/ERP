@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../providers/auth_provider.dart';
 import '../../shared/widgets/async_states.dart';
@@ -36,9 +37,12 @@ final _todayStatusProvider = FutureProvider.autoDispose((ref) async {
 class AttendanceScreen extends ConsumerWidget {
   const AttendanceScreen({super.key});
 
-  Future<void> _checkIn(WidgetRef ref) async {
+  Future<void> _checkIn(BuildContext context, WidgetRef ref) async {
     final me = await ref.read(currentEmployeeProvider.future);
-    if (me == null) return;
+    if (me == null) {
+      notifyProfileNotReady(context);
+      return;
+    }
     final today = DateTime.now().toIso8601String().split('T').first;
     await SupabaseService.client.from(Tables.attendance).upsert({
       'employee_id': me.id,
@@ -50,9 +54,12 @@ class AttendanceScreen extends ConsumerWidget {
     ref.invalidate(_todayStatusProvider);
   }
 
-  Future<void> _checkOut(WidgetRef ref) async {
+  Future<void> _checkOut(BuildContext context, WidgetRef ref) async {
     final me = await ref.read(currentEmployeeProvider.future);
-    if (me == null) return;
+    if (me == null) {
+      notifyProfileNotReady(context);
+      return;
+    }
     final today = DateTime.now().toIso8601String().split('T').first;
     await SupabaseService.client
         .from(Tables.attendance)
@@ -134,7 +141,7 @@ class AttendanceScreen extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: checkedIn ? null : () => _checkIn(ref),
+                                onPressed: checkedIn ? null : () => _checkIn(context, ref),
                                 icon: const Icon(Icons.login, size: 18),
                                 label: const Text('Check In'),
                               ),
@@ -142,7 +149,7 @@ class AttendanceScreen extends ConsumerWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: (!checkedIn || checkedOut) ? null : () => _checkOut(ref),
+                                onPressed: (!checkedIn || checkedOut) ? null : () => _checkOut(context, ref),
                                 icon: const Icon(Icons.logout, size: 18),
                                 label: const Text('Check Out'),
                               ),

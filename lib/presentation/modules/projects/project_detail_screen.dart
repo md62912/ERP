@@ -10,6 +10,7 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/kanban_board.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/utils/error_helper.dart';
+import '../../../core/utils/profile_guard.dart';
 
 Color _priorityColor(TaskPriority p) => switch (p) {
       TaskPriority.low => Colors.blueGrey,
@@ -96,7 +97,10 @@ class ProjectDetailScreen extends ConsumerWidget {
                   ? null
                   : () async {
                       final me = await ref.read(currentEmployeeProvider.future);
-                      if (me == null) return;
+                      if (me == null) {
+                        notifyProfileNotReady(context);
+                        return;
+                      }
                       try {
                         await ref.read(taskRepositoryProvider).createTask(
                               projectId: projectId,

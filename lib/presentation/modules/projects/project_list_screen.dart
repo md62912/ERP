@@ -9,6 +9,7 @@ import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/utils/error_helper.dart';
+import '../../../core/utils/profile_guard.dart';
 
 Color _projectStatusColor(ProjectStatus s) => switch (s) {
       ProjectStatus.planning => Colors.blueGrey,
@@ -120,7 +121,10 @@ class ProjectListScreen extends ConsumerWidget {
                   ? null
                   : () async {
                       final me = await ref.read(currentEmployeeProvider.future);
-                      if (me == null) return;
+                      if (me == null) {
+                        notifyProfileNotReady(context);
+                        return;
+                      }
                       try {
                         await ref.read(projectActionsProvider).createProject(
                               name: nameCtrl.text.trim(),

@@ -4,11 +4,14 @@ import '../../../core/constants/app_colors.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../../core/utils/error_helper.dart';
 
-/// Creates an auth account only. There's deliberately no employee-table
-/// insert here: RLS restricts that table's writes to hr/admin, so a
-/// self-serve sign-up can't (and shouldn't be able to) grant itself an
-/// employee record, a role, or a department. HR links the account to an
-/// employee row afterward (see README).
+/// Creates an auth account. The matching employee profile is created
+/// automatically by a Postgres trigger on auth.users (migration 036/037):
+/// the new user gets a default 'employee' role (the very first confirmed
+/// user in an empty org bootstraps as 'admin'). RLS still blocks a client
+/// from self-assigning a role -- the elevation happens server-side in the
+/// SECURITY DEFINER trigger, never from the app. No manual HR linking is
+/// required; an admin can later adjust role/department from the Employees
+/// screen.
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
@@ -83,7 +86,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Sign up with your work email. HR will finish setting up your\nemployee profile before you can access company data.',
+            'Sign up with your work email. Your employee profile is created\nautomatically — an admin can adjust your role and department later.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
           ),
           const SizedBox(height: 24),
@@ -159,8 +162,8 @@ class _SuccessMessage extends StatelessWidget {
         Text('Check your email', style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
         const SizedBox(height: 8),
         Text(
-          'Confirm your address, then ask HR to link your account to an '
-          'employee profile — you\'ll be able to sign in fully once that\'s done.',
+          'Confirm your email address, then sign in — your workspace is '
+          'ready and waiting.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
         ),

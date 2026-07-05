@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/project_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../domain/entities/project.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -56,7 +57,10 @@ class MyTasksScreen extends ConsumerWidget {
               final hours = double.tryParse(hoursCtrl.text);
               if (hours == null || hours <= 0) return;
               final me = await ref.read(currentEmployeeProvider.future);
-              if (me == null) return;
+              if (me == null) {
+                notifyProfileNotReady(context);
+                return;
+              }
               await ref.read(taskRepositoryProvider).logTime(
                     taskId: task.id,
                     employeeId: me.id,

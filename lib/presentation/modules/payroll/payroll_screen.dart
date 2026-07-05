@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/payslip_pdf.dart';
 import '../../../core/utils/error_helper.dart';
+import '../../../core/utils/profile_guard.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../../domain/entities/employee.dart';
@@ -38,7 +39,10 @@ class PayrollScreen extends ConsumerWidget {
 
   Future<void> _downloadPdf(BuildContext context, WidgetRef ref, Map<String, dynamic> payslip) async {
     final me = await ref.read(currentEmployeeProvider.future);
-    if (me == null) return;
+    if (me == null) {
+      notifyProfileNotReady(context);
+      return;
+    }
     try {
       await sharePayslipPdf(payslip: payslip, employeeName: me.fullName, empCode: me.empCode);
     } catch (e) {
