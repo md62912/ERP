@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../core/utils/attendance_rules.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/profile_guard.dart';
+import '../../../core/services/location_service.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
 import '../../../domain/entities/employee.dart';
 import '../../providers/auth_provider.dart';
@@ -41,6 +43,39 @@ final _todayStatusProvider = FutureProvider.autoDispose((ref) async {
 class AttendanceScreen extends ConsumerWidget {
   const AttendanceScreen({super.key});
 
+  /// Whether [position] falls within range of at least one of this
+  /// employee's assigned projects that has a configured site location.
+  /// Returns null if no comparison was possible (no assigned project has a
+  /// configured location) -- meaning the check-in is logged but not flagged
+  /// either way.
+  Future<bool?> _checkGeofence(String employeeId, Position position) async {
+    final memberships = await SupabaseService.client
+        .from(Tables.projectMembers)
+        .select('projects(site_latitude, site_longitude, geofence_radius_meters)')
+        .eq('employee_id', employeeId);
+
+    final sites = <Map<String, dynamic>>[];
+    for (final m in (memberships as List)) {
+      final project = m['projects'] as Map?;
+      if (project != null && project['site_latitude'] != null && project['site_longitude'] != null) {
+        sites.add(project.cast<String, dynamic>());
+      }
+    }
+    if (sites.isEmpty) return null; // no configured site to compare against
+
+    for (final site in sites) {
+      final distance = LocationService.distanceMeters(
+        lat1: position.latitude,
+        lon1: position.longitude,
+        lat2: (site['site_latitude'] as num).toDouble(),
+        lon2: (site['site_longitude'] as num).toDouble(),
+      );
+      final radius = (site['geofence_radius_meters'] as num?)?.toDouble() ?? 200;
+      if (distance <= radius) return false; // within range of at least one site
+    }
+    return true; // outside range of every assigned site
+  }
+
   Future<void> _checkIn(BuildContext context, WidgetRef ref) async {
     final me = await ref.read(currentEmployeeProvider.future);
     if (me == null) {
@@ -52,12 +87,34 @@ class AttendanceScreen extends ConsumerWidget {
     // Status is derived by the rules engine (late vs present) rather than
     // hardcoded, based on whether the check-in beat the lateness cutoff.
     final status = AttendanceRules.deriveStatus(checkIn: now, checkOut: null);
+
+    // Best-effort location capture -- never blocks check-in if it fails.
+    final capture = await LocationService.tryCapture();
+    bool? flagged;
+    if (capture.position != null) {
+      flagged = await _checkGeofence(me.id, capture.position!);
+    }
+
     await SupabaseService.client.from(Tables.attendance).upsert({
       'employee_id': me.id,
       'date': today,
       'check_in': now.toIso8601String(),
       'status': status,
+      if (capture.position != null) 'latitude': capture.position!.latitude,
+      if (capture.position != null) 'longitude': capture.position!.longitude,
+      'location_flagged': flagged,
     }, onConflict: 'employee_id,date');
+
+    if (context.mounted && flagged == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You're checked in, but this location is outside your project site's expected range.")),
+      );
+    } else if (context.mounted && capture.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Checked in. ${capture.error}")),
+      );
+    }
+
     ref.invalidate(_myAttendanceProvider);
     ref.invalidate(_todayStatusProvider);
   }
@@ -199,6 +256,7 @@ class AttendanceScreen extends ConsumerWidget {
                             final worked = AttendanceRules.workHours(checkIn: ci, checkOut: co);
                             final ot = AttendanceRules.overtimeHours(checkIn: ci, checkOut: co);
                             final late = ci != null && AttendanceRules.isLate(ci);
+                            final locationFlagged = row?['location_flagged'] == true;
                             return Wrap(
                               spacing: 8,
                               runSpacing: 8,
@@ -209,6 +267,8 @@ class AttendanceScreen extends ConsumerWidget {
                                   StatusPill(label: '${ot}h overtime', color: Colors.deepPurple, icon: Icons.more_time),
                                 if (late)
                                   StatusPill(label: 'Late arrival', color: Colors.orange, icon: Icons.running_with_errors),
+                                if (locationFlagged)
+                                  StatusPill(label: 'Off-site', color: Colors.red, icon: Icons.location_off_outlined),
                                 if (ci == null)
                                   StatusPill(
                                     label: 'Starts ${AttendanceRules.workStartHour.toString().padLeft(2, '0')}:${AttendanceRules.workStartMinute.toString().padLeft(2, '0')}',
@@ -321,7 +381,15 @@ class _AttendanceRow extends StatelessWidget {
           backgroundColor: color.withOpacity(0.14),
           child: Text('${date.day}', style: TextStyle(color: color, fontWeight: FontWeight.w700)),
         ),
-        title: Text(Formatters.date(date)),
+        title: Row(
+          children: [
+            Text(Formatters.date(date)),
+            if (row['location_flagged'] == true) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.location_off_outlined, size: 14, color: Colors.red),
+            ],
+          ],
+        ),
         subtitle: Text(
           'In: ${row['check_in'] != null ? Formatters.time(DateTime.parse(row['check_in'])) : '-'}   '
           'Out: ${row['check_out'] != null ? Formatters.time(DateTime.parse(row['check_out'])) : '-'}'

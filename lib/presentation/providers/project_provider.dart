@@ -153,6 +153,10 @@ class ProjectActions {
   /// Creates a project owned by [ownerId]. RLS allows anyone to create a
   /// project they own (owner_id = auth_employee_id() always satisfies the
   /// policy), or hr/admin/manager to create on behalf of anyone.
+  ///
+  /// [siteLatitude]/[siteLongitude] are optional -- when set, attendance
+  /// check-ins for employees on this project are compared against them
+  /// (within [geofenceRadiusMeters]) and flagged if outside range.
   Future<void> createProject({
     required String name,
     String? description,
@@ -161,6 +165,9 @@ class ProjectActions {
     DateTime? startDate,
     DateTime? endDate,
     double? budget,
+    double? siteLatitude,
+    double? siteLongitude,
+    double geofenceRadiusMeters = 200,
   }) async {
     await SupabaseService.client.from(Tables.projects).insert({
       'name': name,
@@ -170,6 +177,9 @@ class ProjectActions {
       'start_date': startDate?.toIso8601String().split('T').first,
       'end_date': endDate?.toIso8601String().split('T').first,
       'budget': budget,
+      'site_latitude': siteLatitude,
+      'site_longitude': siteLongitude,
+      'geofence_radius_meters': geofenceRadiusMeters,
     });
   }
 }

@@ -10,6 +10,7 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/utils/error_helper.dart';
 import '../../../core/utils/profile_guard.dart';
+import '../../../core/services/location_service.dart';
 
 Color _projectStatusColor(ProjectStatus s) => switch (s) {
       ProjectStatus.planning => Colors.blueGrey,
@@ -54,9 +55,13 @@ class ProjectListScreen extends ConsumerWidget {
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     final budgetCtrl = TextEditingController();
+    final latCtrl = TextEditingController();
+    final lonCtrl = TextEditingController();
+    final radiusCtrl = TextEditingController(text: '200');
     ProjectStatus status = ProjectStatus.planning;
     DateTime? startDate;
     DateTime? endDate;
+    bool capturingLocation = false;
 
     await showDialog(
       context: context,
@@ -111,6 +116,64 @@ class ProjectListScreen extends ConsumerWidget {
                   },
                   child: Text(endDate == null ? 'Pick end date (optional)' : 'End: ${Formatters.date(endDate)}'),
                 ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Site location (optional)', style: Theme.of(context).textTheme.titleSmall),
+                ),
+                Text(
+                  "Used to flag attendance check-ins that happen outside this project's site.",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: capturingLocation
+                      ? null
+                      : () async {
+                          setState(() => capturingLocation = true);
+                          final capture = await LocationService.tryCapture();
+                          setState(() {
+                            capturingLocation = false;
+                            if (capture.position != null) {
+                              latCtrl.text = capture.position!.latitude.toStringAsFixed(6);
+                              lonCtrl.text = capture.position!.longitude.toStringAsFixed(6);
+                            }
+                          });
+                          if (capture.error != null && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(capture.error!)));
+                          }
+                        },
+                  icon: capturingLocation
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location, size: 18),
+                  label: Text(capturingLocation ? 'Getting location…' : 'Use my current location'),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: latCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        decoration: const InputDecoration(labelText: 'Latitude'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: lonCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        decoration: const InputDecoration(labelText: 'Longitude'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: radiusCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Allowed radius (meters)'),
+                ),
               ],
             ),
           ),
@@ -134,6 +197,9 @@ class ProjectListScreen extends ConsumerWidget {
                               startDate: startDate,
                               endDate: endDate,
                               budget: double.tryParse(budgetCtrl.text),
+                              siteLatitude: double.tryParse(latCtrl.text),
+                              siteLongitude: double.tryParse(lonCtrl.text),
+                              geofenceRadiusMeters: double.tryParse(radiusCtrl.text) ?? 200,
                             );
                         if (context.mounted) Navigator.pop(context);
                         ref.invalidate(projectListProvider);

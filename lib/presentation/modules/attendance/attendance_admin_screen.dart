@@ -228,7 +228,15 @@ class _RosterRow extends StatelessWidget {
           backgroundColor: color.withOpacity(0.14),
           child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: color, fontWeight: FontWeight.w700)),
         ),
-        title: Text(name),
+        title: Row(
+          children: [
+            Text(name),
+            if (row?['location_flagged'] == true) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.location_off_outlined, size: 14, color: Colors.red),
+            ],
+          ],
+        ),
         subtitle: Text(
           '${designation ?? ''}${designation != null ? ' · ' : ''}In: $checkIn  Out: $checkOut'
           '${hours != null && hours > 0 ? '  ·  ${hours}h' : ''}',

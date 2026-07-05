@@ -88,7 +88,7 @@ jobs:
       - name: Generate app icons
         run: dart run flutter_launcher_icons
 
-      - name: Ensure INTERNET permission is declared
+      - name: Ensure INTERNET and location permissions are declared
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
           if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
@@ -96,6 +96,13 @@ jobs:
             echo "Added missing INTERNET permission"
           else
             echo "INTERNET permission already present"
+          fi
+          if ! grep -q 'android.permission.ACCESS_FINE_LOCATION' "$MANIFEST"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' "$MANIFEST"
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
+            echo "Added missing location permissions"
+          else
+            echo "Location permissions already present"
           fi
           cat "$MANIFEST"
 
