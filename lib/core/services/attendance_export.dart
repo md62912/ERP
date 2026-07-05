@@ -1,12 +1,14 @@
-import 'dart:convert';
-import 'package:share_plus/share_plus.dart';
 import '../utils/attendance_rules.dart';
 import '../utils/formatters.dart';
+// Conditional import: real browser-download impl on web, no-op stub on
+// native. This avoids any native share/file plugin (which broke the
+// Android build) while keeping CSV export fully working on web.
+import 'attendance_export_stub.dart'
+    if (dart.library.html) 'attendance_export_web.dart';
 
-/// Builds an Excel-openable CSV of a day's attendance roster and opens the
-/// platform share sheet (on web this downloads the file; on Android/iOS it
-/// offers the native share/save options). Uses share_plus so no
-/// platform-specific file-path handling is needed.
+/// Builds an Excel-openable CSV of a day's attendance roster and saves it.
+/// On web this triggers a browser download; on native it currently throws
+/// UnsupportedError (mobile export deferred — see downloadCsv stub).
 ///
 /// [employees] is the full active roster so people with no attendance row
 /// still appear as Absent; [roster] maps employee_id -> attendance row.
@@ -18,7 +20,6 @@ Future<void> exportAttendanceCsv({
   final dateStr = date.toIso8601String().split('T').first;
   final buffer = StringBuffer();
 
-  // Header row.
   buffer.writeln('Employee,Designation,Date,Status,Check In,Check Out,Work Hours');
 
   for (final e in employees) {
@@ -42,19 +43,11 @@ Future<void> exportAttendanceCsv({
     ].join(','));
   }
 
-  final bytes = utf8.encode(buffer.toString());
-  // share_plus 7.2.2's shareXFiles doesn't support fileNameOverrides (added
-  // in a later major version). Pass the name via XFile.fromData's `name`
-  // instead -- honored on web (the download filename), ignored on native
-  // where the OS names the temp file, which is acceptable.
-  await Share.shareXFiles(
-    [XFile.fromData(bytes, mimeType: 'text/csv', name: 'attendance_$dateStr.csv')],
-    subject: 'Attendance report $dateStr',
-  );
+  final csv = buffer.toString();
+  downloadCsv(filename: 'attendance_$dateStr.csv', content: csv);
 }
 
-/// Escapes a CSV field: wraps in quotes and doubles internal quotes if it
-/// contains a comma, quote, or newline.
+/// Escapes a CSV field.
 String _csv(String value) {
   if (value.contains(',') || value.contains('"') || value.contains('\n')) {
     return '"${value.replaceAll('"', '""')}"';

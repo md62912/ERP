@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/attendance_rules.dart';
@@ -88,8 +89,12 @@ class _AttendanceAdminScreenState extends ConsumerState<AttendanceAdminScreen> {
                 )
               : IconButton(
                   icon: const Icon(Icons.file_download_outlined),
-                  tooltip: 'Export CSV',
-                  onPressed: _export,
+                  tooltip: kIsWeb ? 'Export CSV' : 'Export (web app only)',
+                  onPressed: kIsWeb
+                      ? _export
+                      : () => ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('CSV export is available on the web app.')),
+                          ),
                 ),
         ],
       ),
