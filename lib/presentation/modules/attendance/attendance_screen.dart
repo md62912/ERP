@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/attendance_rules.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/profile_guard.dart';
 import '../../../data/datasources/supabase/supabase_client.dart';
+import '../../../domain/entities/employee.dart';
 import '../../providers/auth_provider.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/status_pill.dart';
+import 'attendance_admin_screen.dart';
+import 'attendance_calendar.dart';
 
 final _myAttendanceProvider = FutureProvider.autoDispose((ref) async {
   final me = await ref.watch(currentEmployeeProvider.future);
@@ -43,12 +47,16 @@ class AttendanceScreen extends ConsumerWidget {
       notifyProfileNotReady(context);
       return;
     }
-    final today = DateTime.now().toIso8601String().split('T').first;
+    final now = DateTime.now();
+    final today = now.toIso8601String().split('T').first;
+    // Status is derived by the rules engine (late vs present) rather than
+    // hardcoded, based on whether the check-in beat the lateness cutoff.
+    final status = AttendanceRules.deriveStatus(checkIn: now, checkOut: null);
     await SupabaseService.client.from(Tables.attendance).upsert({
       'employee_id': me.id,
       'date': today,
-      'check_in': DateTime.now().toIso8601String(),
-      'status': 'present',
+      'check_in': now.toIso8601String(),
+      'status': status,
     }, onConflict: 'employee_id,date');
     ref.invalidate(_myAttendanceProvider);
     ref.invalidate(_todayStatusProvider);
@@ -60,10 +68,32 @@ class AttendanceScreen extends ConsumerWidget {
       notifyProfileNotReady(context);
       return;
     }
-    final today = DateTime.now().toIso8601String().split('T').first;
+    final now = DateTime.now();
+    final today = now.toIso8601String().split('T').first;
+
+    // Re-read today's check-in so we can compute final work_hours and a
+    // status that accounts for the full day (e.g. half-day if short).
+    final existing = await SupabaseService.client
+        .from(Tables.attendance)
+        .select('check_in')
+        .eq('employee_id', me.id)
+        .eq('date', today)
+        .maybeSingle();
+
+    DateTime? checkIn;
+    if (existing != null && existing['check_in'] != null) {
+      checkIn = DateTime.parse(existing['check_in'] as String);
+    }
+    final hours = AttendanceRules.workHours(checkIn: checkIn, checkOut: now);
+    final status = AttendanceRules.deriveStatus(checkIn: checkIn, checkOut: now);
+
     await SupabaseService.client
         .from(Tables.attendance)
-        .update({'check_out': DateTime.now().toIso8601String()})
+        .update({
+          'check_out': now.toIso8601String(),
+          'work_hours': hours,
+          'status': status,
+        })
         .eq('employee_id', me.id)
         .eq('date', today);
     ref.invalidate(_myAttendanceProvider);
@@ -76,11 +106,36 @@ class AttendanceScreen extends ConsumerWidget {
     final todayStatus = ref.watch(_todayStatusProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Attendance')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(_myAttendanceProvider);
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Attendance'),
+          actions: [
+            Consumer(
+              builder: (context, ref, _) {
+                final role = ref.watch(currentUserRoleProvider);
+                if (role == UserRole.admin || role == UserRole.hr) {
+                  return IconButton(
+                    icon: const Icon(Icons.groups_outlined),
+                    tooltip: 'Team attendance',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AttendanceAdminScreen()),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
+          bottom: const TabBar(tabs: [Tab(text: 'Today'), Tab(text: 'Calendar')]),
+        ),
+        body: TabBarView(
+          children: [
+            RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(_myAttendanceProvider);
           ref.invalidate(_todayStatusProvider);
         },
         child: ListView(
@@ -136,6 +191,34 @@ class AttendanceScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        Builder(
+                          builder: (context) {
+                            final ci = row?['check_in'] != null ? DateTime.parse(row!['check_in']) : null;
+                            final co = row?['check_out'] != null ? DateTime.parse(row!['check_out']) : null;
+                            final worked = AttendanceRules.workHours(checkIn: ci, checkOut: co);
+                            final ot = AttendanceRules.overtimeHours(checkIn: ci, checkOut: co);
+                            final late = ci != null && AttendanceRules.isLate(ci);
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                if (worked > 0)
+                                  StatusPill(label: '${worked}h worked', color: Colors.indigo, icon: Icons.timelapse),
+                                if (ot > 0)
+                                  StatusPill(label: '${ot}h overtime', color: Colors.deepPurple, icon: Icons.more_time),
+                                if (late)
+                                  StatusPill(label: 'Late arrival', color: Colors.orange, icon: Icons.running_with_errors),
+                                if (ci == null)
+                                  StatusPill(
+                                    label: 'Starts ${AttendanceRules.workStartHour.toString().padLeft(2, '0')}:${AttendanceRules.workStartMinute.toString().padLeft(2, '0')}',
+                                    color: Colors.blueGrey,
+                                    icon: Icons.schedule,
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                         const SizedBox(height: 20),
                         Row(
                           children: [
@@ -183,6 +266,10 @@ class AttendanceScreen extends ConsumerWidget {
             ),
           ],
         ),
+            ),
+            const AttendanceCalendar(),
+          ],
+        ),
       ),
     );
   }
@@ -221,31 +308,26 @@ class _AttendanceRow extends StatelessWidget {
   final Map<String, dynamic> row;
   const _AttendanceRow({required this.row});
 
-  Color _statusColor(String status) => switch (status) {
-        'present' => Colors.green,
-        'late' => Colors.orange,
-        'absent' => Colors.red,
-        'half_day' => Colors.amber,
-        _ => Colors.blueGrey,
-      };
-
   @override
   Widget build(BuildContext context) {
     final date = DateTime.parse(row['date'] as String);
     final status = row['status'] as String? ?? 'present';
+    final workHours = (row['work_hours'] as num?)?.toDouble();
+    final color = AttendanceRules.color(status);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: _statusColor(status).withOpacity(0.14),
-          child: Text('${date.day}', style: TextStyle(color: _statusColor(status), fontWeight: FontWeight.w700)),
+          backgroundColor: color.withOpacity(0.14),
+          child: Text('${date.day}', style: TextStyle(color: color, fontWeight: FontWeight.w700)),
         ),
         title: Text(Formatters.date(date)),
         subtitle: Text(
           'In: ${row['check_in'] != null ? Formatters.time(DateTime.parse(row['check_in'])) : '-'}   '
-          'Out: ${row['check_out'] != null ? Formatters.time(DateTime.parse(row['check_out'])) : '-'}',
+          'Out: ${row['check_out'] != null ? Formatters.time(DateTime.parse(row['check_out'])) : '-'}'
+          '${workHours != null && workHours > 0 ? '   ·   ${workHours}h' : ''}',
         ),
-        trailing: StatusPill(label: status.replaceAll('_', ' '), color: _statusColor(status)),
+        trailing: StatusPill(label: AttendanceRules.label(status), color: color),
       ),
     );
   }
