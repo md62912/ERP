@@ -183,7 +183,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               padding: const EdgeInsets.only(top: 4, left: 4),
               child: Text(
                 '"Manager" here means broad company-wide visibility (similar to HR/Admin). '
-                'Leave approval for direct reports works automatically from "Reports to" below, '
+                'Leave approval for direct reports works automatically from "Reports to" above, '
                 'regardless of this setting -- e.g. a Site Engineer with role "employee" can '
                 'still approve their own Technicians\' leave. Job title goes in Designation above.',
                 style: Theme.of(context).textTheme.bodySmall,

@@ -6,26 +6,40 @@ import 'notification_provider.dart';
 
 /// Events either created by me or where I'm an invited attendee, from
 /// today onward — a simple upcoming-agenda view.
+///
+/// This has to be two separate queries rather than one .or(): PostgREST
+/// (and by extension supabase-flutter) doesn't support an .or() filter
+/// that spans the base table and an embedded table's column in a single
+/// call -- per Supabase's own docs, that's simply not supported and was
+/// causing this whole screen to fail to load.
 final myUpcomingEventsProvider = FutureProvider.autoDispose<List<ScheduleEvent>>((ref) async {
   final me = await ref.watch(currentEmployeeProvider.future);
   if (me == null) return [];
 
-  final rows = await SupabaseService.client
+  final nowIso = DateTime.now().toIso8601String();
+  final client = SupabaseService.client;
+
+  final createdByMe = await client
+      .from(Tables.scheduleEvents)
+      .select()
+      .eq('created_by', me.id)
+      .gte('end_time', nowIso);
+
+  final invitedToMe = await client
       .from(Tables.scheduleEvents)
       .select('*, schedule_attendees!inner(employee_id)')
-      .or('created_by.eq.${me.id},schedule_attendees.employee_id.eq.${me.id}')
-      .gte('end_time', DateTime.now().toIso8601String())
-      .order('start_time');
+      .eq('schedule_attendees.employee_id', me.id)
+      .gte('end_time', nowIso);
 
-  // dedupe (a creator who's also an attendee could appear twice)
   final seen = <String>{};
   final events = <ScheduleEvent>[];
-  for (final row in rows as List) {
+  for (final row in [...createdByMe, ...invitedToMe]) {
     final map = row as Map<String, dynamic>;
     if (seen.add(map['id'] as String)) {
       events.add(ScheduleEvent.fromJson(map));
     }
   }
+  events.sort((a, b) => a.startTime.compareTo(b.startTime));
   return events;
 });
 

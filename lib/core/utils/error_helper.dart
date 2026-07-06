@@ -25,7 +25,7 @@ String friendlyError(Object error) {
     if (code == '23514' || message.contains('violates check constraint')) {
       return 'One of the values entered isn\'t valid.';
     }
-    return 'Something went wrong saving that. Please try again.';
+    return 'Something went wrong with that request. Please try again.';
   }
 
   if (error is AuthException) {
