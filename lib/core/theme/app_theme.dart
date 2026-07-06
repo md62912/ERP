@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
 
 /// A single design system shared by light and dark mode -- every component
 /// (cards, inputs, buttons, nav bar, chips, dialogs) is themed explicitly
 /// rather than leaning on Material 3 defaults, so both modes look
 /// intentional instead of "light mode designed, dark mode auto-generated."
+///
+/// Visual direction leans Fluent 2 (Windows 11 / Teams): a clean geometric
+/// typeface, soft floating shadows on cards/dialogs rather than flat
+/// borders, and crisp-but-rounded control corners.
 class AppTheme {
   AppTheme._();
 
-  static const double radiusSm = 10;
-  static const double radiusMd = 14;
+  static const double radiusSm = 8;
+  static const double radiusMd = 12;
   static const double radiusLg = 20;
 
   static ThemeData get light => _build(
@@ -49,9 +54,9 @@ class AppTheme {
       onSurface: textPrimary,
     );
 
-    final baseTextTheme = (isDark ? ThemeData.dark() : ThemeData.light())
-        .textTheme
-        .apply(bodyColor: textPrimary, displayColor: textPrimary);
+    final baseTextTheme = GoogleFonts.plusJakartaSansTextTheme(
+      (isDark ? ThemeData.dark() : ThemeData.light()).textTheme,
+    ).apply(bodyColor: textPrimary, displayColor: textPrimary);
 
     return ThemeData(
       useMaterial3: true,
@@ -75,7 +80,8 @@ class AppTheme {
         foregroundColor: textPrimary,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        scrolledUnderElevation: 2,
+        shadowColor: Colors.black.withOpacity(isDark ? 0.4 : 0.06),
         centerTitle: false,
         titleTextStyle: TextStyle(
           color: textPrimary,
@@ -87,13 +93,14 @@ class AppTheme {
       ),
 
       cardTheme: CardThemeData(
-        elevation: 0,
+        elevation: 3,
+        shadowColor: Colors.black.withOpacity(isDark ? 0.45 : 0.08),
         color: surface,
         clipBehavior: Clip.antiAlias,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusMd),
-          side: BorderSide(color: border, width: 1),
+          side: BorderSide(color: border.withOpacity(0.5), width: 1),
         ),
       ),
 
@@ -176,7 +183,8 @@ class AppTheme {
         backgroundColor: surface,
         indicatorColor: AppColors.primary.withOpacity(0.16),
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        elevation: 4,
+        shadowColor: Colors.black.withOpacity(isDark ? 0.4 : 0.06),
         height: 64,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
@@ -204,6 +212,8 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
+        elevation: 8,
+        shadowColor: Colors.black.withOpacity(isDark ? 0.55 : 0.16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusLg)),
         titleTextStyle: TextStyle(color: textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
         contentTextStyle: TextStyle(color: textSecondary, fontSize: 14),
@@ -219,6 +229,8 @@ class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
+        elevation: 8,
+        shadowColor: Colors.black.withOpacity(isDark ? 0.55 : 0.16),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(radiusLg)),
         ),
